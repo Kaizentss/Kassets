@@ -1,0 +1,100 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "$2a$10$tk/tkUGGh1/1VBTJteXG5u26fxpczVQguevCJjlr69udhG8lEHf3O",
+      "display_name": "Gino R.",
+      "email": "",
+      "role": "admin",
+      "is_active": 1,
+      "created_at": "2026-01-18T04:43:34.245Z"
+    },
+    {
+      "id": 2,
+      "username": "Jon",
+      "password": "$2a$10$t2R.rHPj0LCxuik0OzwqEeMOe1obplRG1Nb3MEJ6JHmSMO9nVqgwy",
+      "display_name": "Jon A.",
+      "email": "",
+      "role": "admin",
+      "is_active": 1,
+      "created_at": "2026-01-18T05:46:02.477Z"
+    },
+    {
+      "id": 3,
+      "username": "Michael",
+      "password": "$2a$10$S7TdI7DH/zna7WKFJeSZ9eXcqyPh655Bzx1FUWncD9Rs6jUStOU6a",
+      "display_name": "Michael F.",
+      "email": "",
+      "role": "viewer",
+      "is_active": 1,
+      "created_at": "2026-01-18T16:50:03.197Z"
+    }
+  ],
+  "assets": [],
+  "locations": [
+    {
+      "id": 3,
+      "name": "Kent HQ",
+      "address": "",
+      "created_at": "2026-01-18T06:25:06.250Z"
+    },
+    {
+      "id": 4,
+      "name": "Gino HQ",
+      "address": "114 185th pl sw bothell wa 98012",
+      "created_at": "2026-01-18T06:25:47.854Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": 1,
+      "name": "Materials24"
+    },
+    {
+      "id": 3,
+      "name": "VCI"
+    },
+    {
+      "id": 3,
+      "name": "Vehicles"
+    },
+    {
+      "id": 4,
+      "name": "Electronics"
+    },
+    {
+      "id": 7,
+      "name": "Inventory"
+    },
+    {
+      "id": 8,
+      "name": "Other"
+    },
+    {
+      "id": 9,
+      "name": "Devices"
+    },
+    {
+      "id": 1,
+      "name": "Equipment"
+    },
+    {
+      "id": 2,
+      "name": "Furniture"
+    },
+    {
+      "id": 5,
+      "name": "Machinery"
+    },
+    {
+      "id": 6,
+      "name": "Real Estate"
+    }
+  ],
+  "settings": {
+    "company_name": "Kaizen Automotive"
+  },
+  "photos": [],
+  "notes": []
+}
