@@ -12,7 +12,7 @@ module.exports = (db) => {
   router.post('/auth/login', (req, res) => {
     try {
       const { username, password } = req.body;
-      const user = db.getUser(username);
+      const user = db.getUserByUsername(username);
       if (!user || !bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
@@ -24,7 +24,7 @@ module.exports = (db) => {
   });
 
   router.get('/auth/me', auth, (req, res) => {
-    const user = db.getUserById(req.user.id);
+    const user = db.getUser(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ id: user.id, username: user.username, displayName: user.display_name, email: user.email, role: user.role });
   });
@@ -32,7 +32,7 @@ module.exports = (db) => {
   router.post('/auth/change-password', auth, (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      const user = db.getUserById(req.user.id);
+      const user = db.getUser(req.user.id);
       if (!user || !bcrypt.compareSync(currentPassword, user.password)) {
         return res.status(400).json({ error: 'Wrong current password' });
       }
@@ -54,11 +54,10 @@ module.exports = (db) => {
       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
       const user = db.createUser({
         username,
-        password: bcrypt.hashSync(password, 10),
+        password,
         display_name: displayName || username,
         email: email || '',
-        role: role || 'viewer',
-        is_active: 1
+        role: role || 'viewer'
       });
       res.json({ id: user.id });
     } catch (e) {
@@ -83,7 +82,7 @@ module.exports = (db) => {
 
   router.post('/users/:id/reset-password', auth, isAdmin, (req, res) => {
     try {
-      db.updateUser(parseInt(req.params.id), { password: bcrypt.hashSync(req.body.newPassword, 10) });
+      db.updateUser(parseInt(req.params.id), { password: req.body.newPassword });
       res.json({ message: 'Password reset' });
     } catch (e) {
       res.status(500).json({ error: e.message });
