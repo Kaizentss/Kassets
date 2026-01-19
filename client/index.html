@@ -414,6 +414,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [bulkTransferTo, setBulkTransferTo] = useState('');
   const [bulkCategoryTo, setBulkCategoryTo] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
+  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showNotesModal, setShowNotesModal] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
@@ -506,6 +507,10 @@ const AssetManager = ({ user, onLogout }) => {
   };
 
   const handleUpdateAsset = async () => {
+    // Prevent double-clicks
+    if (isSavingAsset) return;
+    setIsSavingAsset(true);
+    
     try {
       // Find original asset to compare changes
       const originalAsset = assets.find(a => a.id === editingAsset.id);
@@ -551,15 +556,18 @@ const AssetManager = ({ user, onLogout }) => {
         locationId: editingAsset.locationId
       })});
       
-      // Add automatic notes if there were changes
+      // Add automatic notes if there were changes (only once each)
       for (const noteText of autoNotes) {
-        console.log('Adding note:', noteText);
         await api('/assets/' + editingAsset.id + '/notes', { method: 'POST', body: JSON.stringify({ text: noteText }) });
       }
       
+      await loadAllData();
       setEditingAsset(null);
-      loadAllData();
-    } catch (e) { alert(e.message); }
+      setIsSavingAsset(false);
+    } catch (e) { 
+      setIsSavingAsset(false);
+      alert(e.message); 
+    }
   };
 
   const handleDeleteAsset = async (id) => {
@@ -1758,8 +1766,10 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setEditingAsset(null)}>Cancel</button>
-              <button className="btn-primary" onClick={handleUpdateAsset}>Save</button>
+              <button className="btn-secondary" onClick={() => setEditingAsset(null)} disabled={isSavingAsset}>Cancel</button>
+              <button className="btn-primary" onClick={handleUpdateAsset} disabled={isSavingAsset}>
+                {isSavingAsset ? '⏳ Saving...' : 'Save'}
+              </button>
             </div>
           </div>
         </div>
