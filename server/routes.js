@@ -172,7 +172,8 @@ module.exports = (db) => {
 
   router.delete('/categories/:id', auth, canEdit, (req, res) => {
     try {
-      db.deleteCategory(parseInt(req.params.id));
+      const force = req.query.force === 'true';
+      db.deleteCategory(parseInt(req.params.id), force);
       res.json({ message: 'Deleted' });
     } catch (e) {
       res.status(400).json({ error: e.message });
