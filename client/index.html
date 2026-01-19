@@ -168,38 +168,80 @@ const LoginPage = ({ onLogin, theme, toggleTheme }) => {
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       
-      // Create multiple coin "clinks" for bag of coins effect
-      for (let i = 0; i < 10; i++) {
-        const delay = i * 0.06 + Math.random() * 0.04;
+      // Initial bag opening thud
+      const thud = audioCtx.createOscillator();
+      const thudGain = audioCtx.createGain();
+      thud.frequency.setValueAtTime(80, audioCtx.currentTime);
+      thud.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+      thud.type = 'sine';
+      thudGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      thudGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      thud.connect(thudGain);
+      thudGain.connect(audioCtx.destination);
+      thud.start();
+      thud.stop(audioCtx.currentTime + 0.2);
+      
+      // Coins pouring out - lots of them with varied timing
+      const coinCount = 18;
+      for (let i = 0; i < coinCount; i++) {
+        // Coins fall faster at first, then slow down (like pouring)
+        const pourCurve = Math.pow(i / coinCount, 0.6);
+        const delay = 0.05 + pourCurve * 0.7 + Math.random() * 0.08;
         
-        const osc = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+        // High metallic "ting" - the coin hitting
+        const ting = audioCtx.createOscillator();
+        const ting2 = audioCtx.createOscillator();
+        const tingGain = audioCtx.createGain();
         
-        const baseFreq = 1800 + Math.random() * 2500;
-        osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime + delay);
-        osc.frequency.exponentialRampToValueAtTime(500, audioCtx.currentTime + delay + 0.12);
-        osc.type = 'sine';
+        // Random frequencies for different coin sizes (gold, silver, copper)
+        const coinType = Math.random();
+        let baseFreq;
+        if (coinType > 0.7) baseFreq = 3500 + Math.random() * 1500; // Gold - high ping
+        else if (coinType > 0.3) baseFreq = 2500 + Math.random() * 1000; // Silver - medium
+        else baseFreq = 1800 + Math.random() * 800; // Copper - lower
         
-        osc2.frequency.setValueAtTime(baseFreq * 1.5, audioCtx.currentTime + delay);
-        osc2.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + delay + 0.1);
-        osc2.type = 'triangle';
+        ting.frequency.setValueAtTime(baseFreq, audioCtx.currentTime + delay);
+        ting.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, audioCtx.currentTime + delay + 0.08);
+        ting.type = 'sine';
         
-        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime + delay);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.2);
+        // Harmonic overtone for metallic quality
+        ting2.frequency.setValueAtTime(baseFreq * 2.4, audioCtx.currentTime + delay);
+        ting2.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, audioCtx.currentTime + delay + 0.05);
+        ting2.type = 'sine';
         
-        osc.connect(gainNode);
-        osc2.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
+        // Volume varies - some coins louder than others
+        const volume = 0.08 + Math.random() * 0.12;
+        tingGain.gain.setValueAtTime(volume, audioCtx.currentTime + delay);
+        tingGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.15);
         
-        osc.start(audioCtx.currentTime + delay);
-        osc2.start(audioCtx.currentTime + delay);
-        osc.stop(audioCtx.currentTime + delay + 0.25);
-        osc2.stop(audioCtx.currentTime + delay + 0.25);
+        ting.connect(tingGain);
+        ting2.connect(tingGain);
+        tingGain.connect(audioCtx.destination);
+        
+        ting.start(audioCtx.currentTime + delay);
+        ting2.start(audioCtx.currentTime + delay);
+        ting.stop(audioCtx.currentTime + delay + 0.2);
+        ting2.stop(audioCtx.currentTime + delay + 0.2);
+        
+        // Some coins bounce/rattle (secondary hit)
+        if (Math.random() > 0.5) {
+          const bounceDelay = delay + 0.06 + Math.random() * 0.04;
+          const bounce = audioCtx.createOscillator();
+          const bounceGain = audioCtx.createGain();
+          bounce.frequency.setValueAtTime(baseFreq * 0.8, audioCtx.currentTime + bounceDelay);
+          bounce.frequency.exponentialRampToValueAtTime(baseFreq * 0.3, audioCtx.currentTime + bounceDelay + 0.04);
+          bounce.type = 'sine';
+          bounceGain.gain.setValueAtTime(volume * 0.4, audioCtx.currentTime + bounceDelay);
+          bounceGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + bounceDelay + 0.08);
+          bounce.connect(bounceGain);
+          bounceGain.connect(audioCtx.destination);
+          bounce.start(audioCtx.currentTime + bounceDelay);
+          bounce.stop(audioCtx.currentTime + bounceDelay + 0.1);
+        }
       }
       
-      // Bag rustle noise
-      const bufferSize = audioCtx.sampleRate * 0.4;
+      // Leather bag / cloth rustle sound
+      const bufferSize = audioCtx.sampleRate * 0.6;
       const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
@@ -208,15 +250,33 @@ const LoginPage = ({ onLogin, theme, toggleTheme }) => {
       const noise = audioCtx.createBufferSource();
       noise.buffer = noiseBuffer;
       const noiseFilter = audioCtx.createBiquadFilter();
-      noiseFilter.type = 'lowpass';
-      noiseFilter.frequency.value = 600;
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 800;
+      noiseFilter.Q.value = 0.5;
       const noiseGain = audioCtx.createGain();
-      noiseGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+      noiseGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      noiseGain.gain.setValueAtTime(0.08, audioCtx.currentTime + 0.1);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
       noise.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(audioCtx.destination);
       noise.start();
+      
+      // Final settling jingle - a few last coins
+      for (let i = 0; i < 4; i++) {
+        const finalDelay = 0.75 + i * 0.12 + Math.random() * 0.06;
+        const settle = audioCtx.createOscillator();
+        const settleGain = audioCtx.createGain();
+        settle.frequency.setValueAtTime(2000 + Math.random() * 1500, audioCtx.currentTime + finalDelay);
+        settle.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + finalDelay + 0.06);
+        settle.type = 'sine';
+        settleGain.gain.setValueAtTime(0.05, audioCtx.currentTime + finalDelay);
+        settleGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + finalDelay + 0.1);
+        settle.connect(settleGain);
+        settleGain.connect(audioCtx.destination);
+        settle.start(audioCtx.currentTime + finalDelay);
+        settle.stop(audioCtx.currentTime + finalDelay + 0.15);
+      }
     } catch (e) {
       console.log('Audio error:', e);
     }
