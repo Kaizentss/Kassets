@@ -731,7 +731,19 @@ const AssetManager = ({ user, onLogout }) => {
       try {
         await api('/categories/' + found.id, { method: 'DELETE' });
         loadAllData();
-      } catch (e) { alert(e.message); }
+      } catch (e) { 
+        // If assets are attached, ask if user wants to force delete
+        if (e.message.includes('assets use this category')) {
+          if (confirm(e.message + '\n\nForce delete? Assets will be moved to "Other" category.')) {
+            try {
+              await api('/categories/' + found.id + '?force=true', { method: 'DELETE' });
+              loadAllData();
+            } catch (e2) { alert(e2.message); }
+          }
+        } else {
+          alert(e.message);
+        }
+      }
     }
   };
 
