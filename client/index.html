@@ -449,6 +449,8 @@ const AssetManager = ({ user, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [isAddingAsset, setIsAddingAsset] = useState(false);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
@@ -521,6 +523,7 @@ const AssetManager = ({ user, onLogout }) => {
   // Asset CRUD
   const handleAddAsset = async () => {
     if (!newAsset.name) return alert('Name required');
+    setIsAddingAsset(true);
     try {
       const assetData = {
         ...newAsset,
@@ -532,17 +535,21 @@ const AssetManager = ({ user, onLogout }) => {
       
       const result = await api('/assets', { method: 'POST', body: JSON.stringify(assetData) });
       
-      // Upload photos if any were added
+      // Upload photos if any were added (in parallel for speed)
       if (newAsset.photos?.length > 0) {
-        for (const photo of newAsset.photos) {
-          await api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) });
-        }
+        await Promise.all(newAsset.photos.map(photo => 
+          api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) })
+        ));
       }
       
+      await loadAllData();
       setShowAddAsset(false);
+      setIsAddingAsset(false);
       setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: '', description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
-      loadAllData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { 
+      setIsAddingAsset(false);
+      alert(e.message); 
+    }
   };
 
   const handleUpdateAsset = async () => {
@@ -786,24 +793,51 @@ const AssetManager = ({ user, onLogout }) => {
       alert(`Only uploading ${maxAllowed} photo(s). Maximum 5 photos per asset.`);
     }
     
-    for (const file of filesToUpload) {
-      await new Promise((resolve) => {
+    setIsUploadingPhotos(true);
+    
+    // Compress image function
+    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+      return new Promise(resolve => {
         const reader = new FileReader();
-        reader.onload = async () => {
-          try {
-            await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: reader.result, name: file.name }) });
-          } catch (err) { console.error(err); }
-          resolve();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
       });
+    };
+    
+    try {
+      // Compress and upload all photos in parallel
+      await Promise.all(filesToUpload.map(async (file) => {
+        const compressedUrl = await compressImage(file);
+        await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: compressedUrl, name: file.name }) });
+      }));
+      
+      await loadAllData();
+      if (editingAsset) {
+        const updated = (await api('/assets')).find(a => a.id === assetId);
+        if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
+      }
+    } catch (err) {
+      alert('Photo upload failed. Please try again.');
     }
     
-    loadAllData();
-    if (editingAsset) {
-      const updated = (await api('/assets')).find(a => a.id === assetId);
-      if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
-    }
+    setIsUploadingPhotos(false);
     e.target.value = ''; // Reset input
   };
 
@@ -1561,9 +1595,12 @@ const AssetManager = ({ user, onLogout }) => {
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>Photos ({newAsset.photos?.length || 0}/5)</label>
+                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>
+                  Photos ({newAsset.photos?.length || 0}/5)
+                  {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
+                </label>
                 {(newAsset.photos?.length || 0) < 5 && (
-                  <input type="file" accept="image/*" multiple onChange={async (e) => {
+                  <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={async (e) => {
                     const files = Array.from(e.target.files);
                     const currentPhotos = newAsset.photos || [];
                     const available = 5 - currentPhotos.length;
@@ -1571,16 +1608,47 @@ const AssetManager = ({ user, onLogout }) => {
                       alert(`Can only add ${available} more photo(s)`);
                     }
                     const toUpload = files.slice(0, available);
-                    const newPhotos = [];
-                    for (const file of toUpload) {
-                      const reader = new FileReader();
-                      const url = await new Promise(resolve => {
-                        reader.onload = (ev) => resolve(ev.target.result);
+                    
+                    setIsUploadingPhotos(true);
+                    
+                    // Compress image function
+                    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+                      return new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const img = new Image();
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > maxWidth) {
+                              height = (height * maxWidth) / width;
+                              width = maxWidth;
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', quality));
+                          };
+                          img.src = ev.target.result;
+                        };
                         reader.readAsDataURL(file);
                       });
-                      newPhotos.push({ id: Date.now() + Math.random(), url, name: file.name });
+                    };
+                    
+                    try {
+                      // Compress all photos in parallel
+                      const newPhotos = await Promise.all(toUpload.map(async (file) => {
+                        const url = await compressImage(file);
+                        return { id: Date.now() + Math.random(), url, name: file.name };
+                      }));
+                      setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
+                    } catch (err) {
+                      alert('Failed to process photos. Please try again.');
                     }
-                    setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
+                    
+                    setIsUploadingPhotos(false);
                     e.target.value = '';
                   }} style={{ color: '#94a3b8', fontSize: 13 }} />
                 )}
@@ -1597,8 +1665,10 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleAddAsset}>Add Asset</button>
+              <button className="btn-secondary" onClick={() => setShowAddAsset(false)} disabled={isAddingAsset}>Cancel</button>
+              <button className="btn-primary" onClick={handleAddAsset} disabled={isAddingAsset || isUploadingPhotos}>
+                {isAddingAsset ? '⏳ Adding...' : 'Add Asset'}
+              </button>
             </div>
           </div>
         </div>
@@ -1636,8 +1706,11 @@ const AssetManager = ({ user, onLogout }) => {
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>Photos ({editingAsset.photos?.length || 0}/5)</label>
-                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: '#94a3b8', fontSize: 13 }} />}
+                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>
+                  Photos ({editingAsset.photos?.length || 0}/5)
+                  {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
+                </label>
+                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: '#94a3b8', fontSize: 13 }} />}
                 {editingAsset.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                     {editingAsset.photos.map(p => (
