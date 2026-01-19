@@ -9,33 +9,111 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      /* Dark theme (default) */
+      --bg-primary: #09090b;
+      --bg-secondary: #0f172a;
+      --bg-tertiary: #1e293b;
+      --bg-card: rgba(30, 41, 59, 0.7);
+      --bg-card-solid: #1e293b;
+      --bg-input: rgba(15, 23, 42, 0.8);
+      --border-color: rgba(148, 163, 184, 0.1);
+      --border-color-hover: rgba(59, 130, 246, 0.3);
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-green: #34d399;
+      --accent-red: #f87171;
+      --accent-gold: #ffd700;
+      --shadow-color: rgba(0, 0, 0, 0.3);
+      --modal-bg: rgba(0, 0, 0, 0.8);
+      --gradient-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      --gradient-modal: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #f1f5f9;
+      --bg-tertiary: #e2e8f0;
+      --bg-card: rgba(255, 255, 255, 0.9);
+      --bg-card-solid: #ffffff;
+      --bg-input: rgba(241, 245, 249, 0.9);
+      --border-color: rgba(100, 116, 139, 0.2);
+      --border-color-hover: rgba(59, 130, 246, 0.4);
+      --text-primary: #1e293b;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --accent-blue: #2563eb;
+      --accent-green: #059669;
+      --accent-red: #dc2626;
+      --accent-gold: #d97706;
+      --shadow-color: rgba(0, 0, 0, 0.1);
+      --modal-bg: rgba(0, 0, 0, 0.5);
+      --gradient-primary: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%);
+      --gradient-modal: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #09090b; color: #e2e8f0; overflow-x: hidden; }
-    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
-    .stat-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 16px; padding: 24px; transition: all 0.3s ease; }
-    .stat-card:hover { transform: translateY(-2px); border-color: rgba(59, 130, 246, 0.3); }
+    body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow-x: hidden; transition: background 0.3s ease, color 0.3s ease; }
+    .glass-card { background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 8px 32px var(--shadow-color); transition: all 0.3s ease; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; transition: all 0.3s ease; }
+    .stat-card:hover { transform: translateY(-2px); border-color: var(--border-color-hover); }
     .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-family: inherit; font-size: 14px; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .btn-secondary { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); padding: 12px 24px; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; font-family: inherit; font-size: 14px; }
-    .btn-secondary:hover { background: rgba(148, 163, 184, 0.2); color: #e2e8f0; }
+    .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-color); padding: 12px 24px; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; font-family: inherit; font-size: 14px; }
+    .btn-secondary:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .btn-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; font-family: inherit; }
     .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
     .btn-gold { background: linear-gradient(135deg, #ffd700, #d4a000); color: #0f172a; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .input-field { width: 100%; padding: 12px 16px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 10px; color: #e2e8f0; font-size: 15px; transition: all 0.3s ease; font-family: inherit; outline: none; }
-    .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-    .input-field::placeholder { color: #64748b; }
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
-    .modal-content { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; padding: 32px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; }
-    .tab-btn { padding: 12px 20px; background: none; border: none; color: #64748b; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-bottom: 2px solid transparent; font-family: inherit; }
-    .tab-btn:hover { color: #94a3b8; }
-    .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4); }
+    .input-field { width: 100%; padding: 12px 16px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-size: 15px; transition: all 0.3s ease; font-family: inherit; outline: none; }
+    .input-field:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .input-field::placeholder { color: var(--text-muted); }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--modal-bg); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+    .modal-content { background: var(--gradient-modal); border: 1px solid var(--border-color); border-radius: 20px; padding: 32px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; }
+    .tab-btn { padding: 12px 20px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-bottom: 2px solid transparent; font-family: inherit; }
+    .tab-btn:hover { color: var(--text-secondary); }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
     .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
     .location-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-    .asset-row { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; transition: all 0.3s ease; }
-    .asset-row:hover { background: rgba(30, 41, 59, 0.8); border-color: rgba(59, 130, 246, 0.3); }
+    .asset-row { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; transition: all 0.3s ease; }
+    .asset-row:hover { background: var(--bg-tertiary); border-color: var(--border-color-hover); }
     .asset-row.selected { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
-    @media (max-width: 768px) { .hide-mobile { display: none !important; } .modal-content { padding: 20px; margin: 10px; } }
+    .theme-toggle { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s ease; font-size: 18px; }
+    .theme-toggle:hover { background: var(--bg-tertiary); transform: rotate(15deg); }
+
+    /* Chart styles */
+    .chart-container { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; }
+    .chart-bar { height: 24px; border-radius: 6px; transition: all 0.3s ease; min-width: 4px; }
+    .chart-bar:hover { opacity: 0.8; transform: scaleY(1.05); }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .chart-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+    .chart-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* Mobile improvements */
+    @media (max-width: 768px) {
+      .hide-mobile { display: none !important; }
+      .modal-content { padding: 20px; margin: 10px; max-height: 90vh; }
+      .stat-card { padding: 16px; }
+      .asset-row { padding: 12px 14px; }
+      header { padding: 12px 16px !important; }
+      main { padding: 16px !important; }
+      nav { padding: 0 16px !important; }
+      .tab-btn { padding: 10px 14px; font-size: 13px; }
+      .btn-primary, .btn-secondary { padding: 10px 16px; font-size: 13px; }
+      .input-field { padding: 10px 14px; font-size: 14px; }
+      .header-buttons { width: 100%; justify-content: flex-end; }
+      .mobile-full { width: 100% !important; max-width: none !important; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: 1fr !important; }
+      .form-grid-2 { grid-template-columns: 1fr !important; }
+      .btn-group-mobile { flex-direction: column; width: 100%; }
+      .btn-group-mobile > * { width: 100%; }
+    }
     
     /* Print Styles for Balance Sheet */
     @media print {
@@ -63,74 +141,13 @@
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-// Cloudinary Configuration (optional - fallback to base64 if fails)
-const CLOUDINARY_CLOUD_NAME = 'dj7qwdqzt';
-const CLOUDINARY_UPLOAD_PRESET = 'kassets';
-
-// Compress image for faster uploads
-const compressImage = (file, maxWidth = 800, quality = 0.7) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
-// Upload image - try Cloudinary first, fallback to base64
-const uploadImage = async (file) => {
-  // Try Cloudinary first
-  try {
-    const base64 = await compressImage(file);
-    const formData = new FormData();
-    formData.append('file', base64);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      return data.secure_url;
-    }
-  } catch (e) {
-    console.log('Cloudinary failed, using base64 fallback');
-  }
-  
-  // Fallback to base64 (stored in database)
-  return await compressImage(file);
-};
-
 // API Helper
 const api = async (endpoint, options = {}) => {
   const token = localStorage.getItem('kassets_token');
-  // Add cache-busting for GET requests
-  const url = options.method && options.method !== 'GET' 
-    ? '/api' + endpoint 
-    : '/api' + endpoint + (endpoint.includes('?') ? '&' : '?') + '_t=' + Date.now();
-  const res = await fetch(url, {
+  const res = await fetch('/api' + endpoint, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
       ...(token && { Authorization: 'Bearer ' + token }),
       ...options.headers
     }
@@ -141,7 +158,7 @@ const api = async (endpoint, options = {}) => {
 };
 
 // Login Page Component
-const LoginPage = ({ onLogin }) => {
+const LoginPage = ({ onLogin, theme, toggleTheme }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -222,8 +239,12 @@ const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'rgba(30, 41, 59, 0.9)', backdropFilter: 'blur(20px)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: 24, padding: 48, width: '100%', maxWidth: 420 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative' }}>
+      {/* Theme toggle on login page */}
+      <button className="theme-toggle" onClick={toggleTheme} style={{ position: 'absolute', top: 20, right: 20 }} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-color)', borderRadius: 24, padding: 48, width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <svg viewBox="0 0 400 400" width="80" height="80" style={{ marginBottom: 16 }}>
             <defs>
@@ -279,16 +300,16 @@ const LoginPage = ({ onLogin }) => {
             </g>
           </svg>
           <h1 style={{ fontSize: 32, fontWeight: 700, background: 'linear-gradient(135deg, #ffd700, #d4a000)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>KASSETS</h1>
-          <p style={{ color: '#64748b', marginTop: 8 }}>Asset Management System</p>
+          <p style={{ color: 'var(--text-muted)', marginTop: 8 }}>Asset Management System</p>
         </div>
         <form onSubmit={handleSubmit}>
-          {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: 12, marginBottom: 20, color: '#f87171' }}>{error}</div>}
+          {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: 12, marginBottom: 20, color: 'var(--accent-red)' }}>{error}</div>}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Username</label>
+            <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-secondary)', fontSize: 14 }}>Username</label>
             <input type="text" className="input-field" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter username" required />
           </div>
           <div style={{ marginBottom: 28 }}>
-            <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Password</label>
+            <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-secondary)', fontSize: 14 }}>Password</label>
             <input type="password" className="input-field" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" required />
           </div>
           <button type="submit" className="btn-gold" style={{ width: '100%', padding: 16, fontSize: 16 }} disabled={loading}>
@@ -428,7 +449,6 @@ const AssetManager = ({ user, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
-  const [isAddingAsset, setIsAddingAsset] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
@@ -501,7 +521,6 @@ const AssetManager = ({ user, onLogout }) => {
   // Asset CRUD
   const handleAddAsset = async () => {
     if (!newAsset.name) return alert('Name required');
-    setIsAddingAsset(true);
     try {
       const assetData = {
         ...newAsset,
@@ -509,28 +528,21 @@ const AssetManager = ({ user, onLogout }) => {
         currentValue: parseFloat(newAsset.currentValue) || 0,
         quantity: parseInt(newAsset.quantity) || 1
       };
-      delete assetData.photos;
+      delete assetData.photos; // Remove photos from asset data, we'll add them separately
       
       const result = await api('/assets', { method: 'POST', body: JSON.stringify(assetData) });
       
-      // Upload photos if any were added (in parallel for speed)
+      // Upload photos if any were added
       if (newAsset.photos?.length > 0) {
-        await Promise.all(newAsset.photos.map(photo => 
-          api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) })
-        ));
+        for (const photo of newAsset.photos) {
+          await api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) });
+        }
       }
       
-      // Reload data first, then close modal
-      await loadAllData();
-      
-      // Now close modal and reset form
       setShowAddAsset(false);
-      setIsAddingAsset(false);
       setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: '', description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
-    } catch (e) { 
-      setIsAddingAsset(false);
-      alert(e.message); 
-    }
+      loadAllData();
+    } catch (e) { alert(e.message); }
   };
 
   const handleUpdateAsset = async () => {
@@ -774,14 +786,17 @@ const AssetManager = ({ user, onLogout }) => {
       alert(`Only uploading ${maxAllowed} photo(s). Maximum 5 photos per asset.`);
     }
     
-    try {
-      // Upload to Cloudinary and save to database in parallel
-      await Promise.all(filesToUpload.map(async (file) => {
-        const cloudinaryUrl = await uploadImage(file);
-        await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: cloudinaryUrl, name: file.name }) });
-      }));
-    } catch (err) {
-      alert('Photo upload failed. Please try again.');
+    for (const file of filesToUpload) {
+      await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: reader.result, name: file.name }) });
+          } catch (err) { console.error(err); }
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
     }
     
     loadAllData();
@@ -799,10 +814,12 @@ const AssetManager = ({ user, onLogout }) => {
   const totals = calculateTotals();
 
 
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--gradient-primary)' }}>
       {/* Header */}
-      <header style={{ padding: '16px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <header style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <svg viewBox="0 0 400 400" width="56" height="56">
             <defs>
@@ -859,23 +876,26 @@ const AssetManager = ({ user, onLogout }) => {
           </svg>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, #ffd700, #d4a000)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{companyName || 'KASSETS'}</h1>
-            <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Asset Management</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>Asset Management</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: '#64748b', fontSize: 13 }}>👤 {user.displayName || user.username}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} className="header-buttons">
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }} className="hide-mobile">👤 {user.displayName || user.username}</span>
           <span className="category-badge">{user.role}</span>
+          <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           {isAdmin && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowUserMgmt(true)}>Users</button>}
           <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowSettings(true)}>⚙️</button>
-          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
-          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
+          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
+          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
           {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => setShowAddAsset(true)}>+ Asset</button>}
           <button className="btn-danger" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onLogout}>Logout</button>
         </div>
       </header>
 
       {/* Tabs */}
-      <nav style={{ padding: '0 24px', borderBottom: '1px solid rgba(148,163,184,0.1)', display: 'flex', gap: 4, overflowX: 'auto' }}>
+      <nav style={{ padding: '0 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 4, overflowX: 'auto' }}>
         {(isAdmin ? ['dashboard', 'assets', 'locations', 'balance-sheet'] : ['dashboard', 'assets', 'locations']).map(tab => (
           <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
@@ -888,55 +908,110 @@ const AssetManager = ({ user, onLogout }) => {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
+            {/* Stats Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }} className="stat-grid">
               <div className="stat-card">
-                <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Total Assets</p>
-                <p style={{ fontSize: 28, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{totals.totalAssets}</p>
-                <p style={{ color: '#64748b', fontSize: 12, marginTop: 8 }}>{locations.length} locations</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>Total Assets</p>
+                <p style={{ fontSize: 28, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-primary)' }}>{totals.totalAssets}</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>{locations.length} locations • {categories.filter(c => assets.some(a => a.category === c)).length} categories</p>
               </div>
               {isAdmin && (
                 <>
-                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(30,41,59,0.8))' }}>
-                    <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Current Value</p>
-                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: '#34d399' }}>{formatCurrency(totals.totalCurrentValue)}</p>
+                  <div className="stat-card" style={{ borderLeft: '4px solid var(--accent-green)' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>Current Value</p>
+                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: 'var(--accent-green)' }}>{formatCurrency(totals.totalCurrentValue)}</p>
                   </div>
                   <div className="stat-card">
-                    <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Purchase Cost</p>
-                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{formatCurrency(totals.totalPurchaseCost)}</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>Purchase Cost</p>
+                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-primary)' }}>{formatCurrency(totals.totalPurchaseCost)}</p>
                   </div>
-                  <div className="stat-card">
-                    <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Depreciation</p>
-                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: totals.totalPurchaseCost - totals.totalCurrentValue > 0 ? '#f87171' : '#34d399' }}>
+                  <div className="stat-card" style={{ borderLeft: `4px solid ${totals.totalPurchaseCost - totals.totalCurrentValue > 0 ? 'var(--accent-red)' : 'var(--accent-green)'}` }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>Depreciation</p>
+                    <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: totals.totalPurchaseCost - totals.totalCurrentValue > 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
                       {totals.totalPurchaseCost - totals.totalCurrentValue > 0 ? '-' : '+'}{formatCurrency(Math.abs(totals.totalPurchaseCost - totals.totalCurrentValue))}
                     </p>
                   </div>
                 </>
               )}
             </div>
+
+            {/* Charts Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 32 }}>
+              {/* Asset Count by Category Chart */}
+              <BarChart
+                title="Assets by Category"
+                colorScheme="mixed"
+                data={categories.map(cat => {
+                  const count = assets.filter(a => a.category === cat).reduce((s, a) => s + a.quantity, 0);
+                  return { label: cat, value: count, displayValue: count };
+                }).filter(d => d.value > 0).sort((a, b) => b.value - a.value)}
+              />
+
+              {/* Asset Count by Location Chart */}
+              <BarChart
+                title="Assets by Location"
+                colorScheme="green"
+                data={locations.map(loc => {
+                  const count = assets.filter(a => a.locationId === loc.id).reduce((s, a) => s + a.quantity, 0);
+                  return { label: loc.name, value: count, displayValue: count };
+                }).sort((a, b) => b.value - a.value)}
+              />
+            </div>
+
+            {/* Donut Charts for Admin */}
+            {isAdmin && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 32 }}>
+                <DonutChart
+                  title="Value Distribution by Category"
+                  data={categories.map(cat => {
+                    const value = assets.filter(a => a.category === cat).reduce((s, a) => s + (a.currentValue || 0) * (a.quantity || 1), 0);
+                    return { label: cat, value, displayValue: formatCurrency(value) };
+                  }).filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 6)}
+                />
+
+                <DonutChart
+                  title="Value Distribution by Location"
+                  data={locations.map(loc => {
+                    const value = assets.filter(a => a.locationId === loc.id).reduce((s, a) => s + (a.currentValue || 0) * (a.quantity || 1), 0);
+                    return { label: loc.name, value, displayValue: formatCurrency(value) };
+                  }).filter(d => d.value > 0).sort((a, b) => b.value - a.value)}
+                />
+              </div>
+            )}
+
+            {/* Detailed Lists */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
               <div className="glass-card" style={{ padding: 24 }}>
-                <h3 style={{ marginBottom: 16 }}>By Category</h3>
+                <h3 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>Category Summary</h3>
                 {categories.map(cat => {
                   const catAssets = assets.filter(a => a.category === cat);
                   const catValue = catAssets.reduce((s, a) => s + (a.currentValue || 0) * (a.quantity || 1), 0);
+                  const catCount = catAssets.reduce((s, a) => s + (a.quantity || 1), 0);
                   if (catAssets.length === 0) return null;
                   return (
-                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-                      <span>{cat} ({catAssets.length})</span>
-                      {isAdmin && <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#34d399' }}>{formatCurrency(catValue)}</span>}
+                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)' }}>{cat}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>{catCount} items</span>
+                      </div>
+                      {isAdmin && <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--accent-green)', fontSize: 14 }}>{formatCurrency(catValue)}</span>}
                     </div>
                   );
                 })}
               </div>
               <div className="glass-card" style={{ padding: 24 }}>
-                <h3 style={{ marginBottom: 16 }}>By Location</h3>
+                <h3 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>Location Summary</h3>
                 {locations.map(loc => {
                   const locAssets = assets.filter(a => a.locationId === loc.id);
                   const locValue = locAssets.reduce((s, a) => s + (a.currentValue || 0) * (a.quantity || 1), 0);
+                  const locCount = locAssets.reduce((s, a) => s + (a.quantity || 1), 0);
                   return (
-                    <div key={loc.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-                      <span>{loc.name} ({locAssets.length})</span>
-                      {isAdmin && <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#34d399' }}>{formatCurrency(locValue)}</span>}
+                    <div key={loc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)' }}>{loc.name}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>{locCount} items</span>
+                      </div>
+                      {isAdmin && <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--accent-green)', fontSize: 14 }}>{formatCurrency(locValue)}</span>}
                     </div>
                   );
                 })}
@@ -1496,18 +1571,16 @@ const AssetManager = ({ user, onLogout }) => {
                       alert(`Can only add ${available} more photo(s)`);
                     }
                     const toUpload = files.slice(0, available);
-                    
-                    // Upload to Cloudinary in parallel
-                    try {
-                      const uploadPromises = toUpload.map(async (file) => {
-                        const url = await uploadImage(file);
-                        return { id: Date.now() + Math.random(), url, name: file.name };
+                    const newPhotos = [];
+                    for (const file of toUpload) {
+                      const reader = new FileReader();
+                      const url = await new Promise(resolve => {
+                        reader.onload = (ev) => resolve(ev.target.result);
+                        reader.readAsDataURL(file);
                       });
-                      const newPhotos = await Promise.all(uploadPromises);
-                      setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
-                    } catch (err) {
-                      alert('Photo upload failed. Please try again.');
+                      newPhotos.push({ id: Date.now() + Math.random(), url, name: file.name });
                     }
+                    setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
                     e.target.value = '';
                   }} style={{ color: '#94a3b8', fontSize: 13 }} />
                 )}
@@ -1525,7 +1598,7 @@ const AssetManager = ({ user, onLogout }) => {
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleAddAsset} disabled={isAddingAsset}>{isAddingAsset ? 'Adding...' : 'Add Asset'}</button>
+              <button className="btn-primary" onClick={handleAddAsset}>Add Asset</button>
             </div>
           </div>
         </div>
@@ -1805,10 +1878,109 @@ const AssetManager = ({ user, onLogout }) => {
   );
 };
 
+// Theme Context
+const ThemeContext = React.createContext();
+
+const useTheme = () => React.useContext(ThemeContext);
+
+// Simple Bar Chart Component
+const BarChart = ({ data, title, showValues = true, colorScheme = 'blue' }) => {
+  const maxValue = Math.max(...data.map(d => d.value), 1);
+  const colors = {
+    blue: ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8', '#1e40af', '#3b82f6', '#60a5fa'],
+    green: ['#22c55e', '#4ade80', '#86efac', '#16a34a', '#15803d', '#166534', '#22c55e', '#4ade80'],
+    mixed: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
+  };
+  const colorPalette = colors[colorScheme] || colors.mixed;
+
+  return (
+    <div className="chart-container">
+      {title && <h4 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>{title}</h4>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {data.map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 100, fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+            <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: 6, height: 24, overflow: 'hidden' }}>
+              <div
+                className="chart-bar"
+                style={{
+                  width: `${(item.value / maxValue) * 100}%`,
+                  background: colorPalette[idx % colorPalette.length],
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  paddingRight: 8
+                }}
+              >
+                {showValues && item.value > maxValue * 0.15 && (
+                  <span style={{ fontSize: 11, color: 'white', fontWeight: 600 }}>{item.displayValue || item.value}</span>
+                )}
+              </div>
+            </div>
+            {showValues && item.value <= maxValue * 0.15 && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 50 }}>{item.displayValue || item.value}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Donut Chart Component
+const DonutChart = ({ data, title, size = 160 }) => {
+  const total = data.reduce((sum, d) => sum + d.value, 0) || 1;
+  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
+  let cumulativePercent = 0;
+
+  const getCoordinatesForPercent = (percent) => {
+    const x = Math.cos(2 * Math.PI * percent);
+    const y = Math.sin(2 * Math.PI * percent);
+    return [x, y];
+  };
+
+  return (
+    <div className="chart-container" style={{ textAlign: 'center' }}>
+      {title && <h4 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>{title}</h4>}
+      <svg width={size} height={size} viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)', margin: '0 auto', display: 'block' }}>
+        {data.map((item, idx) => {
+          if (item.value === 0) return null;
+          const [startX, startY] = getCoordinatesForPercent(cumulativePercent);
+          const percent = item.value / total;
+          cumulativePercent += percent;
+          const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
+          const largeArcFlag = percent > 0.5 ? 1 : 0;
+          const pathData = `M ${startX} ${startY} A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY} L 0 0`;
+          return (
+            <path key={idx} d={pathData} fill={colors[idx % colors.length]} style={{ opacity: 0.9 }}>
+              <title>{item.label}: {item.displayValue || item.value}</title>
+            </path>
+          );
+        })}
+        <circle cx="0" cy="0" r="0.6" fill="var(--bg-card-solid)" />
+      </svg>
+      <div className="chart-legend" style={{ justifyContent: 'center' }}>
+        {data.filter(d => d.value > 0).map((item, idx) => (
+          <div key={idx} className="chart-legend-item">
+            <div className="chart-legend-dot" style={{ background: colors[idx % colors.length] }} />
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Main App with Auth
 const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState(() => localStorage.getItem('kassets_theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('kassets_theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const token = localStorage.getItem('kassets_token');
@@ -1820,11 +1992,16 @@ const App = () => {
     }
   }, []);
 
-  const handleLogout = () => { localStorage.clear(); setUser(null); };
+  const handleLogout = () => { localStorage.removeItem('kassets_token'); localStorage.removeItem('kassets_user'); setUser(null); };
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
-  if (loading) return <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>Loading...</div>;
-  if (!user) return <LoginPage onLogin={setUser} />;
-  return <AssetManager user={user} onLogout={handleLogout} />;
+  if (loading) return <div style={{ minHeight: '100vh', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Loading...</div>;
+  if (!user) return <LoginPage onLogin={setUser} theme={theme} toggleTheme={toggleTheme} />;
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <AssetManager user={user} onLogout={handleLogout} />
+    </ThemeContext.Provider>
+  );
 };
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
