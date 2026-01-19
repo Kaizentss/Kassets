@@ -51,82 +51,61 @@ if (!db.users.find(u => u.username === 'admin')) {
     id: 1,
     username: 'admin',
     password: bcrypt.hashSync('admin123', 10),
-    role: 'admin',
     display_name: 'Administrator',
+    email: '',
+    role: 'admin',
+    is_active: 1,
     created_at: new Date().toISOString()
   });
-  saveDB(db);
+  console.log('✅ Admin user created (admin / admin123)');
 }
 
-// Helper to get next ID
-const nextId = (arr) => arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1;
+// Create default categories
+const defaultCategories = ['Equipment', 'Furniture', 'Vehicles', 'Electronics', 'Machinery', 'Real Estate', 'Inventory', 'Other'];
+defaultCategories.forEach((name, i) => {
+  if (!db.categories.find(c => c.name === name)) {
+    db.categories.push({ id: i + 1, name });
+  }
+});
 
+// Create default locations
+if (db.locations.length === 0) {
+  db.locations = [
+    { id: 1, name: 'Main Office', address: '123 Business St', created_at: new Date().toISOString() },
+    { id: 2, name: 'Warehouse A', address: '456 Industrial Ave', created_at: new Date().toISOString() },
+    { id: 3, name: 'Remote Site', address: '789 Field Rd', created_at: new Date().toISOString() }
+  ];
+}
+
+saveDB(db);
+console.log('✅ Database ready');
+
+// Helper to get next ID
+function nextId(array) {
+  return array.length > 0 ? Math.max(...array.map(x => x.id)) + 1 : 1;
+}
+
+// Database interface
 module.exports = {
   // Users
-  getUsers: () => db.users.map(u => ({ ...u, password: undefined })),
-  getUser: (id) => db.users.find(u => u.id === id),
-  getUserByUsername: (username) => db.users.find(u => u.username === username),
-  createUser: (userData) => {
-    if (db.users.find(u => u.username === userData.username)) {
-      throw new Error('Username already exists');
-    }
-    const newUser = {
-      id: nextId(db.users),
-      username: userData.username,
-      password: bcrypt.hashSync(userData.password, 10),
-      role: userData.role || 'viewer',
-      display_name: userData.display_name || userData.username,
-      created_at: new Date().toISOString()
-    };
+  getUser: (username) => db.users.find(u => u.username === username && u.is_active),
+  getUserById: (id) => db.users.find(u => u.id === id),
+  getUsers: () => db.users.map(({ password, ...u }) => u),
+  createUser: (user) => {
+    const newUser = { id: nextId(db.users), ...user, created_at: new Date().toISOString() };
     db.users.push(newUser);
     saveDB(db);
-    return { ...newUser, password: undefined };
+    return newUser;
   },
-  updateUser: (id, updates) => {
+  updateUser: (id, data) => {
     const idx = db.users.findIndex(u => u.id === id);
-    if (idx === -1) throw new Error('User not found');
-    if (updates.password) {
-      updates.password = bcrypt.hashSync(updates.password, 10);
+    if (idx !== -1) {
+      db.users[idx] = { ...db.users[idx], ...data };
+      saveDB(db);
     }
-    db.users[idx] = { ...db.users[idx], ...updates };
-    saveDB(db);
-    return { ...db.users[idx], password: undefined };
   },
   deleteUser: (id) => {
-    const user = db.users.find(u => u.id === id);
-    if (user?.username === 'admin') throw new Error('Cannot delete admin');
     db.users = db.users.filter(u => u.id !== id);
-    saveDB(db);
-  },
-  verifyPassword: (user, password) => bcrypt.compareSync(password, user.password),
-
-  // Locations
-  getLocations: () => db.locations,
-  getLocation: (id) => db.locations.find(l => l.id === id),
-  createLocation: (data) => {
-    const newLoc = {
-      id: nextId(db.locations),
-      name: data.name,
-      address: data.address || '',
-      created_at: new Date().toISOString()
-    };
-    db.locations.push(newLoc);
-    saveDB(db);
-    return newLoc;
-  },
-  updateLocation: (id, updates) => {
-    const idx = db.locations.findIndex(l => l.id === id);
-    if (idx === -1) throw new Error('Location not found');
-    db.locations[idx] = { ...db.locations[idx], ...updates };
-    saveDB(db);
-    return db.locations[idx];
-  },
-  deleteLocation: (id) => {
-    const assetsAtLocation = db.assets.filter(a => a.location_id === id);
-    if (assetsAtLocation.length > 0) {
-      throw new Error(`Cannot delete: ${assetsAtLocation.length} assets at this location`);
-    }
-    db.locations = db.locations.filter(l => l.id !== id);
     saveDB(db);
   },
 
@@ -134,42 +113,57 @@ module.exports = {
   getAssets: () => {
     return db.assets.map(a => ({
       ...a,
-      photos: (db.photos || []).filter(p => p.asset_id === a.id),
-      notes: (db.notes || []).filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      location_name: db.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
+      photos: db.photos.filter(p => p.asset_id === a.id),
+      notes: db.notes.filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     }));
   },
   getAsset: (id) => db.assets.find(a => a.id === id),
-  createAsset: (data) => {
-    const newAsset = {
-      id: nextId(db.assets),
-      name: data.name,
-      category: data.category || '',
-      serial_number: data.serial_number || '',
-      part_number: data.part_number || '',
-      description: data.description || '',
-      purchase_date: data.purchase_date || null,
-      purchase_cost: data.purchase_cost || 0,
-      current_value: data.current_value || 0,
-      quantity: data.quantity || 1,
-      depreciation_rate: data.depreciation_rate || 10,
-      location_id: data.location_id || null,
-      created_at: new Date().toISOString()
-    };
+  createAsset: (asset) => {
+    const newAsset = { id: nextId(db.assets), ...asset, created_at: new Date().toISOString() };
     db.assets.push(newAsset);
     saveDB(db);
     return newAsset;
   },
-  updateAsset: (id, updates) => {
+  updateAsset: (id, data) => {
     const idx = db.assets.findIndex(a => a.id === id);
-    if (idx === -1) throw new Error('Asset not found');
-    db.assets[idx] = { ...db.assets[idx], ...updates };
-    saveDB(db);
-    return db.assets[idx];
+    if (idx !== -1) {
+      db.assets[idx] = { ...db.assets[idx], ...data };
+      saveDB(db);
+    }
   },
   deleteAsset: (id) => {
     db.assets = db.assets.filter(a => a.id !== id);
-    db.photos = (db.photos || []).filter(p => p.asset_id !== id);
-    db.notes = (db.notes || []).filter(n => n.asset_id !== id);
+    db.photos = db.photos.filter(p => p.asset_id !== id);
+    db.notes = db.notes.filter(n => n.asset_id !== id);
+    saveDB(db);
+  },
+
+  // Locations
+  getLocations: () => {
+    return db.locations.map(l => ({
+      ...l,
+      asset_count: db.assets.filter(a => a.location_id === l.id).length,
+      total_value: db.assets.filter(a => a.location_id === l.id).reduce((sum, a) => sum + (a.current_value || 0) * (a.quantity || 1), 0)
+    }));
+  },
+  createLocation: (loc) => {
+    const newLoc = { id: nextId(db.locations), ...loc, created_at: new Date().toISOString() };
+    db.locations.push(newLoc);
+    saveDB(db);
+    return newLoc;
+  },
+  updateLocation: (id, data) => {
+    const idx = db.locations.findIndex(l => l.id === id);
+    if (idx !== -1) {
+      db.locations[idx] = { ...db.locations[idx], ...data };
+      saveDB(db);
+    }
+  },
+  deleteLocation: (id) => {
+    const count = db.assets.filter(a => a.location_id === id).length;
+    if (count > 0) throw new Error(`${count} assets in this location`);
+    db.locations = db.locations.filter(l => l.id !== id);
     saveDB(db);
   },
 
@@ -219,41 +213,28 @@ module.exports = {
 
   // Photos
   addPhoto: (assetId, url, name) => {
-    if (!db.photos) db.photos = [];
-    const photo = {
-      id: nextId(db.photos),
-      asset_id: assetId,
-      url,
-      name: name || 'Photo',
-      created_at: new Date().toISOString()
-    };
+    const photo = { id: nextId(db.photos), asset_id: assetId, url, name, created_at: new Date().toISOString() };
     db.photos.push(photo);
     saveDB(db);
     return photo;
   },
-  deletePhoto: (photoId) => {
-    db.photos = (db.photos || []).filter(p => p.id !== photoId);
+  deletePhoto: (id) => {
+    db.photos = db.photos.filter(p => p.id !== id);
     saveDB(db);
   },
-  getPhotos: (assetId) => (db.photos || []).filter(p => p.asset_id === assetId),
 
   // Notes
-  addNote: (assetId, content, author) => {
-    if (!db.notes) db.notes = [];
-    const note = {
-      id: nextId(db.notes),
-      asset_id: assetId,
-      content,
-      author: author || 'System',
-      created_at: new Date().toISOString()
-    };
+  addNote: (assetId, text, createdBy) => {
+    const note = { id: nextId(db.notes), asset_id: assetId, text, created_by: createdBy, created_at: new Date().toISOString() };
     db.notes.push(note);
     saveDB(db);
     return note;
   },
-  deleteNote: (noteId) => {
-    db.notes = (db.notes || []).filter(n => n.id !== noteId);
+  deleteNote: (id) => {
+    db.notes = db.notes.filter(n => n.id !== id);
     saveDB(db);
   },
-  getNotes: (assetId) => (db.notes || []).filter(n => n.asset_id === assetId)
+
+  // Get location by ID
+  getLocation: (id) => db.locations.find(l => l.id === id)
 };
