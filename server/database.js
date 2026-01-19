@@ -195,11 +195,19 @@ module.exports = {
     });
     saveDB(db);
   },
-  deleteCategory: (id) => {
+  deleteCategory: (id, force = false) => {
     const cat = db.categories.find(c => c.id === id);
     if (!cat) throw new Error('Not found');
-    const count = db.assets.filter(a => a.category === cat.name).length;
-    if (count > 0) throw new Error(`${count} assets use this category`);
+    const assetsWithCat = db.assets.filter(a => a.category === cat.name);
+    const count = assetsWithCat.length;
+    if (count > 0 && !force) {
+      const assetNames = assetsWithCat.slice(0, 3).map(a => a.name).join(', ');
+      throw new Error(`${count} assets use this category: ${assetNames}${count > 3 ? '...' : ''}`);
+    }
+    // If force or no assets, reassign assets to "Other" and delete
+    if (count > 0 && force) {
+      assetsWithCat.forEach(a => a.category = 'Other');
+    }
     db.categories = db.categories.filter(c => c.id !== id);
     saveDB(db);
   },
