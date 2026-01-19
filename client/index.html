@@ -565,25 +565,27 @@ const AssetManager = ({ user, onLogout }) => {
       const userName = user.displayName || user.username;
       
       // Check for quantity change
-      if (originalAsset && parseInt(editingAsset.quantity) !== parseInt(originalAsset.quantity)) {
-        const oldQty = parseInt(originalAsset.quantity);
-        const newQty = parseInt(editingAsset.quantity);
+      const oldQty = originalAsset ? parseInt(originalAsset.quantity) || 0 : 0;
+      const newQty = parseInt(editingAsset.quantity) || 0;
+      if (originalAsset && oldQty !== newQty) {
         const diff = newQty - oldQty;
-        if (diff < 0) {
-          autoNotes.push(`📦 QUANTITY DEDUCTED: ${Math.abs(diff)} unit(s) removed (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
-        } else {
-          autoNotes.push(`📦 QUANTITY ADDED: ${diff} unit(s) added (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
-        }
+        const noteText = diff < 0 
+          ? `📦 QUANTITY DEDUCTED: ${Math.abs(diff)} unit(s) removed (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`
+          : `📦 QUANTITY ADDED: ${diff} unit(s) added (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`;
+        autoNotes.push(noteText);
       }
       
       // Check for location change
-      if (originalAsset && parseInt(editingAsset.locationId) !== parseInt(originalAsset.locationId)) {
-        const oldLocation = locations.find(l => l.id === parseInt(originalAsset.locationId))?.name || 'Unknown';
-        const newLocation = locations.find(l => l.id === parseInt(editingAsset.locationId))?.name || 'Unknown';
-        autoNotes.push(`📍 LOCATION CHANGED: Moved from "${oldLocation}" to "${newLocation}" by ${userName} on ${timestamp}`);
+      const oldLocId = originalAsset ? (originalAsset.locationId || null) : null;
+      const newLocId = editingAsset.locationId || null;
+      if (originalAsset && String(oldLocId) !== String(newLocId)) {
+        const oldLocation = locations.find(l => l.id === oldLocId)?.name || 'Unknown';
+        const newLocation = locations.find(l => l.id === parseInt(newLocId))?.name || 'Unknown';
+        const noteText = `📍 LOCATION CHANGED: Moved from "${oldLocation}" to "${newLocation}" by ${userName} on ${timestamp}`;
+        autoNotes.push(noteText);
       }
       
-      // Update the asset
+      // Update the asset first
       await api('/assets/' + editingAsset.id, { method: 'PUT', body: JSON.stringify({
         name: editingAsset.name, category: editingAsset.category, serialNumber: editingAsset.serialNumber, partNumber: editingAsset.partNumber,
         description: editingAsset.description, purchaseDate: editingAsset.purchaseDate,
@@ -594,7 +596,9 @@ const AssetManager = ({ user, onLogout }) => {
       
       // Add automatic notes if there were changes
       for (const noteText of autoNotes) {
-        await api('/assets/' + editingAsset.id + '/notes', { method: 'POST', body: JSON.stringify({ text: noteText }) });
+        if (noteText && noteText.trim()) {
+          await api('/assets/' + editingAsset.id + '/notes', { method: 'POST', body: JSON.stringify({ text: noteText }) });
+        }
       }
       
       setEditingAsset(null);
