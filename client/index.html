@@ -367,6 +367,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [isAddingAsset, setIsAddingAsset] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
@@ -439,6 +440,7 @@ const AssetManager = ({ user, onLogout }) => {
   // Asset CRUD
   const handleAddAsset = async () => {
     if (!newAsset.name) return alert('Name required');
+    setIsAddingAsset(true);
     try {
       const assetData = {
         ...newAsset,
@@ -457,10 +459,17 @@ const AssetManager = ({ user, onLogout }) => {
         }
       }
       
+      // Close modal and reset form immediately
       setShowAddAsset(false);
+      setIsAddingAsset(false);
       setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: '', description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
-      loadAllData();
-    } catch (e) { alert(e.message); }
+      
+      // Reload data after a small delay to ensure state updates on mobile
+      setTimeout(() => loadAllData(), 100);
+    } catch (e) { 
+      setIsAddingAsset(false);
+      alert(e.message); 
+    }
   };
 
   const handleUpdateAsset = async () => {
@@ -1456,7 +1465,7 @@ const AssetManager = ({ user, onLogout }) => {
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleAddAsset}>Add Asset</button>
+              <button className="btn-primary" onClick={handleAddAsset} disabled={isAddingAsset}>{isAddingAsset ? 'Adding...' : 'Add Asset'}</button>
             </div>
           </div>
         </div>
