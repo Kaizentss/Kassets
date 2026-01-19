@@ -602,6 +602,48 @@ const AssetManager = ({ user, onLogout }) => {
     } catch (e) { alert(e.message); }
   };
 
+  const handleRotatePhoto = async (assetId, photo) => {
+    try {
+      // Create a canvas to rotate the image
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = photo.url;
+      });
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Swap width and height for 90 degree rotation
+      canvas.width = img.height;
+      canvas.height = img.width;
+      
+      // Rotate 90 degrees clockwise
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(90 * Math.PI / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      
+      // Get rotated image as base64
+      const rotatedUrl = canvas.toDataURL('image/jpeg', 0.9);
+      
+      // Delete old photo and add new rotated one
+      await api('/assets/' + assetId + '/photos/' + photo.id, { method: 'DELETE' });
+      await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: rotatedUrl, name: photo.name }) });
+      
+      // Refresh
+      await loadAllData();
+      if (editingAsset) {
+        const updated = (await api('/assets')).find(a => a.id === assetId);
+        if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
+      }
+    } catch (e) { 
+      alert('Could not rotate photo: ' + e.message); 
+    }
+  };
+
   const handleBulkTransfer = async () => {
     if (!bulkTransferTo) return;
     try {
@@ -1676,6 +1718,17 @@ const AssetManager = ({ user, onLogout }) => {
                     {editingAsset.photos.map(p => (
                       <div key={p.id} style={{ position: 'relative' }}>
                         <img src={p.url} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6 }} />
+                        <button 
+                          onClick={() => handleRotatePhoto(editingAsset.id, p)}
+                          title="Rotate 90°"
+                          style={{ 
+                            position: 'absolute', top: -6, left: -6, 
+                            width: 20, height: 20, borderRadius: '50%', 
+                            background: '#3b82f6', border: 'none', 
+                            color: 'white', fontSize: 10, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >↻</button>
                         <button 
                           onClick={() => handleDeletePhoto(editingAsset.id, p.id)} 
                           style={{ 
