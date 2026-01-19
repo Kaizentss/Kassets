@@ -166,93 +166,10 @@ const LoginPage = ({ onLogin, theme, toggleTheme }) => {
 
   const playCoinSound = () => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      
-      // Coin drop function - creates a single metallic "clink"
-      const dropCoin = (delay, volume) => {
-        // Metal impact - short burst
-        const impact = audioCtx.createOscillator();
-        const impactGain = audioCtx.createGain();
-        
-        // Lower frequency for heavier metal sound
-        const freq = 800 + Math.random() * 400;
-        impact.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
-        impact.frequency.setValueAtTime(freq * 0.7, audioCtx.currentTime + delay + 0.01);
-        impact.frequency.setValueAtTime(freq * 0.5, audioCtx.currentTime + delay + 0.02);
-        impact.type = 'square';
-        
-        // Very short attack, quick decay
-        impactGain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
-        impactGain.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + delay + 0.005);
-        impactGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.08);
-        
-        // Filter to remove harsh highs
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 2000;
-        filter.Q.value = 1;
-        
-        impact.connect(filter);
-        filter.connect(impactGain);
-        impactGain.connect(audioCtx.destination);
-        
-        impact.start(audioCtx.currentTime + delay);
-        impact.stop(audioCtx.currentTime + delay + 0.1);
-        
-        // Add a subtle ring/resonance
-        const ring = audioCtx.createOscillator();
-        const ringGain = audioCtx.createGain();
-        ring.frequency.setValueAtTime(freq * 1.5, audioCtx.currentTime + delay);
-        ring.type = 'sine';
-        ringGain.gain.setValueAtTime(volume * 0.15, audioCtx.currentTime + delay + 0.01);
-        ringGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.12);
-        ring.connect(ringGain);
-        ringGain.connect(audioCtx.destination);
-        ring.start(audioCtx.currentTime + delay);
-        ring.stop(audioCtx.currentTime + delay + 0.15);
-      };
-      
-      // Pour coins - cluster at the start, then tapering off
-      // First wave - coins dumping out
-      for (let i = 0; i < 8; i++) {
-        const delay = 0.02 + i * 0.035 + Math.random() * 0.025;
-        const vol = 0.15 + Math.random() * 0.1;
-        dropCoin(delay, vol);
-      }
-      
-      // Second wave - more coins following
-      for (let i = 0; i < 6; i++) {
-        const delay = 0.25 + i * 0.05 + Math.random() * 0.03;
-        const vol = 0.1 + Math.random() * 0.08;
-        dropCoin(delay, vol);
-      }
-      
-      // Stragglers - last few coins
-      for (let i = 0; i < 4; i++) {
-        const delay = 0.55 + i * 0.1 + Math.random() * 0.05;
-        const vol = 0.06 + Math.random() * 0.05;
-        dropCoin(delay, vol);
-      }
-      
-      // Soft thud/rustle of the bag
-      const noiseLen = audioCtx.sampleRate * 0.3;
-      const noiseBuffer = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
-      const noiseData = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < noiseLen; i++) {
-        noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
-      }
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = noiseBuffer;
-      const noiseFilter = audioCtx.createBiquadFilter();
-      noiseFilter.type = 'lowpass';
-      noiseFilter.frequency.value = 400;
-      const noiseGain = audioCtx.createGain();
-      noiseGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(audioCtx.destination);
-      noise.start();
-      
+      // Use a real coin sound effect
+      const audio = new Audio('https://cdn.freesound.org/previews/748/748143_1660585-lq.mp3');
+      audio.volume = 0.5;
+      audio.play();
     } catch (e) {
       console.log('Audio error:', e);
     }
