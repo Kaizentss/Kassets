@@ -943,8 +943,8 @@ const AssetManager = ({ user, onLogout }) => {
           </button>
           {isAdmin && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowUserMgmt(true)}>Users</button>}
           <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowSettings(true)}>⚙️</button>
-          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
-          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
+          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
+          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
           {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => setShowAddAsset(true)}>+ Asset</button>}
           <button className="btn-danger" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onLogout}>Logout</button>
         </div>
