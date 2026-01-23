@@ -499,7 +499,9 @@ const AssetManager = ({ user, onLogout }) => {
       await loadAllData();
       setShowAddAsset(false);
       setIsAddingAsset(false);
-      setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: '', description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
+      // Keep the current location filter when resetting the form
+      const keepLocationId = filterLocation !== 'all' ? filterLocation : '';
+      setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: keepLocationId, description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
     } catch (e) { 
       setIsAddingAsset(false);
       alert(e.message); 
@@ -945,7 +947,7 @@ const AssetManager = ({ user, onLogout }) => {
           <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowSettings(true)}>⚙️</button>
           {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
           {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
-          {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => setShowAddAsset(true)}>+ Asset</button>}
+          {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => { setNewAsset({...newAsset, locationId: filterLocation !== 'all' ? filterLocation : ''}); setShowAddAsset(true); }}>+ Asset</button>}
           <button className="btn-danger" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onLogout}>Logout</button>
         </div>
       </header>
