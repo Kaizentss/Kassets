@@ -22,6 +22,9 @@
       --text-primary: #e2e8f0;
       --text-secondary: #94a3b8;
       --text-muted: #64748b;
+      --text-detail: #94a3b8;
+      --badge-blue: #60a5fa;
+      --badge-green: #4ade80;
       --accent-blue: #3b82f6;
       --accent-green: #34d399;
       --accent-red: #f87171;
@@ -41,9 +44,12 @@
       --bg-input: rgba(241, 245, 249, 0.9);
       --border-color: rgba(100, 116, 139, 0.2);
       --border-color-hover: rgba(59, 130, 246, 0.4);
-      --text-primary: #1e293b;
-      --text-secondary: #475569;
-      --text-muted: #64748b;
+      --text-primary: #0f172a;
+      --text-secondary: #1e293b;
+      --text-muted: #334155;
+      --text-detail: #475569;
+      --badge-blue: #1d4ed8;
+      --badge-green: #15803d;
       --accent-blue: #2563eb;
       --accent-green: #059669;
       --accent-red: #dc2626;
@@ -76,8 +82,8 @@
     .tab-btn { padding: 12px 20px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-bottom: 2px solid transparent; font-family: inherit; }
     .tab-btn:hover { color: var(--text-secondary); }
     .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
-    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-    .location-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(59, 130, 246, 0.2); color: var(--badge-blue); }
+    .location-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(34, 197, 94, 0.2); color: var(--badge-green); }
     .asset-row { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; transition: all 0.3s ease; }
     .asset-row:hover { background: var(--bg-tertiary); border-color: var(--border-color-hover); }
     .asset-row.selected { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
@@ -330,7 +336,7 @@ const UserManagement = ({ currentUser, onClose }) => {
                   <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...roleColors[u.role] }}>{u.role.toUpperCase()}</span>
                   {!u.is_active && <span style={{ color: '#f87171', fontSize: 12 }}>INACTIVE</span>}
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>@{u.username}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-detail)' }}>@{u.username}</p>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setEditUser({...u})}>Edit</button>
@@ -1110,7 +1116,7 @@ const AssetManager = ({ user, onLogout }) => {
             
             <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
               {filteredAssets.length === 0 ? (
-                <div className="glass-card" style={{ padding: 40, textAlign: 'center' }}><p style={{ color: '#64748b' }}>No assets found</p></div>
+                <div className="glass-card" style={{ padding: 40, textAlign: 'center' }}><p style={{ color: 'var(--text-detail)' }}>No assets found</p></div>
               ) : filteredAssets.map(asset => (
                 <div key={asset.id} className={`asset-row ${selectedAssets.includes(asset.id) ? 'selected' : ''}`}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1134,7 +1140,7 @@ const AssetManager = ({ user, onLogout }) => {
                       )}
                       <div>
                         <h4 style={{ margin: 0, fontSize: 15 }}>{asset.name}</h4>
-                        <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{asset.partNumber && `P/N: ${asset.partNumber} • `}{asset.serialNumber && `SN: ${asset.serialNumber} • `}Qty: {asset.quantity}{asset.description && ` • ${asset.description}`}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-detail)' }}>{asset.partNumber && `P/N: ${asset.partNumber} • `}{asset.serialNumber && `SN: ${asset.serialNumber} • `}Qty: {asset.quantity}{asset.description && ` • ${asset.description}`}</p>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1163,15 +1169,15 @@ const AssetManager = ({ user, onLogout }) => {
               return (
                 <div key={loc.id} className="glass-card" style={{ padding: 24 }}>
                   <h3 style={{ margin: '0 0 8px' }}>{loc.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 16px' }}>{loc.address || 'No address'}</p>
+                  <p style={{ color: 'var(--text-detail)', fontSize: 13, margin: '0 0 16px' }}>{loc.address || 'No address'}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12 }}>
-                      <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>Assets</p>
+                      <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0 }}>Assets</p>
                       <p style={{ fontSize: 22, fontWeight: 700, margin: '4px 0 0' }}>{locAssets.length}</p>
                     </div>
                     {isAdmin && (
                       <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12 }}>
-                        <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>Value</p>
+                        <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0 }}>Value</p>
                         <p style={{ fontSize: 16, fontWeight: 700, margin: '4px 0 0', color: '#34d399', fontFamily: "'JetBrains Mono', monospace" }}>{formatCurrency(locValue)}</p>
                       </div>
                     )}
@@ -1194,7 +1200,7 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <h2 style={{ margin: 0 }}>{companyName || 'Kassets'} - Balance Sheet</h2>
-                <p style={{ color: '#64748b', marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p style={{ color: 'var(--text-detail)', marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
               <button className="btn-gold" onClick={() => {
                 // Generate professional PDF balance sheet
@@ -1364,15 +1370,15 @@ const AssetManager = ({ user, onLogout }) => {
             {/* Preview on screen */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 32 }}>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #ffd700' }}>
-                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Total Assets (at cost)</p>
+                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Total Assets (at cost)</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace" }}>{formatCurrency(totals.totalPurchaseCost)}</p>
               </div>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #ef4444' }}>
-                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Accumulated Depreciation</p>
+                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Accumulated Depreciation</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace", color: '#f87171' }}>({formatCurrency(totals.totalPurchaseCost - totals.totalCurrentValue)})</p>
               </div>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #22c55e' }}>
-                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Net Book Value</p>
+                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Net Book Value</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace", color: '#34d399' }}>{formatCurrency(totals.totalCurrentValue)}</p>
               </div>
             </div>
@@ -1383,11 +1389,11 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>CATEGORY</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>COUNT</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>CURRENT VALUE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>DEPRECIATION</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CATEGORY</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>COUNT</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CURRENT VALUE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>DEPRECIATION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1417,11 +1423,11 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>LOCATION</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>ASSET COUNT</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>CURRENT VALUE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>% OF TOTAL</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>LOCATION</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>ASSET COUNT</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CURRENT VALUE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>% OF TOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1451,20 +1457,20 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>ASSET NAME</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>SERIAL #</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>LOCATION</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>QTY</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE DATE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>UNIT COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>TOTAL VALUE</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>ASSET NAME</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>SERIAL #</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>LOCATION</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>QTY</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE DATE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>UNIT COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>TOTAL VALUE</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...assets].sort((a, b) => a.name.localeCompare(b.name)).map(a => (
                     <tr key={a.id} style={{ borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
                       <td style={{ padding: 12 }}>{a.name}</td>
-                      <td style={{ padding: 12, color: '#64748b', fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{a.serialNumber || '-'}</td>
+                      <td style={{ padding: 12, color: 'var(--text-detail)', fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{a.serialNumber || '-'}</td>
                       <td style={{ padding: 12 }}>{getLocationName(a.locationId)}</td>
                       <td style={{ padding: 12, textAlign: 'right' }}>{a.quantity}</td>
                       <td style={{ padding: 12 }}>{a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</td>
@@ -1476,7 +1482,7 @@ const AssetManager = ({ user, onLogout }) => {
               </table>
             </div>
             
-            <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(148,163,184,0.2)', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+            <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(148,163,184,0.2)', textAlign: 'center', color: 'var(--text-detail)', fontSize: 12 }}>
               Generated by Kassets Asset Management System
             </div>
           </div>
@@ -1495,13 +1501,13 @@ const AssetManager = ({ user, onLogout }) => {
             <h2 style={{ marginBottom: 20 }}>⚙️ Settings</h2>
             
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8' }}>Company Name</label>
+              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)' }}>Company Name</label>
               <input className="input-field" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enter company name" />
             </div>
             
             <div style={{ borderTop: '1px solid rgba(148,163,184,0.2)', paddingTop: 20, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, marginBottom: 12, color: '#94a3b8' }}>🔐 Account</h3>
-              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Logged in as: <strong style={{ color: '#e2e8f0' }}>{user.displayName || user.username}</strong></p>
+              <h3 style={{ fontSize: 16, marginBottom: 12, color: 'var(--text-detail)' }}>🔐 Account</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-detail)', marginBottom: 12 }}>Logged in as: <strong style={{ color: '#e2e8f0' }}>{user.displayName || user.username}</strong></p>
               <button className="btn-secondary" style={{ width: '100%' }} onClick={() => { setShowSettings(false); setShowChangePassword(true); }}>
                 Change Password
               </button>
@@ -1522,17 +1528,17 @@ const AssetManager = ({ user, onLogout }) => {
             <h2 style={{ marginBottom: 20 }}>🔐 Change Password</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Current Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>Current Password</label>
               <input type="password" className="input-field" value={passwordData.current} onChange={e => setPasswordData({...passwordData, current: e.target.value})} placeholder="Enter current password" />
             </div>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>New Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>New Password</label>
               <input type="password" className="input-field" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} placeholder="Enter new password (min 6 characters)" />
             </div>
             
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Confirm New Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>Confirm New Password</label>
               <input type="password" className="input-field" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} placeholder="Confirm new password" />
             </div>
             
@@ -1571,7 +1577,7 @@ const AssetManager = ({ user, onLogout }) => {
                     </div>
                   ) : (
                     <>
-                      <span>{cat} <span style={{ color: '#64748b', fontSize: 12 }}>({assets.filter(a => a.category === cat).length} assets)</span></span>
+                      <span>{cat} <span style={{ color: 'var(--text-detail)', fontSize: 12 }}>({assets.filter(a => a.category === cat).length} assets)</span></span>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setEditingCategory(cat); setEditingCategoryName(cat); }}>Edit</button>
                         <button className="btn-danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleDeleteCategory(cat)}>Delete</button>
@@ -1609,17 +1615,17 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
               <input className="input-field" placeholder="Description" value={newAsset.description} onChange={e => setNewAsset({...newAsset, description: e.target.value})} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div><label style={{ fontSize: 12, color: '#64748b' }}>Purchase Date</label><input type="date" className="input-field" value={newAsset.purchaseDate} onChange={e => setNewAsset({...newAsset, purchaseDate: e.target.value})} /></div>
-                <div><label style={{ fontSize: 12, color: '#64748b' }}>Quantity</label><input type="number" className="input-field" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: parseInt(e.target.value) || 1})} /></div>
+                <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Purchase Date</label><input type="date" className="input-field" value={newAsset.purchaseDate} onChange={e => setNewAsset({...newAsset, purchaseDate: e.target.value})} /></div>
+                <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Quantity</label><input type="number" className="input-field" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: parseInt(e.target.value) || 1})} /></div>
               </div>
               {isAdmin && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div><label style={{ fontSize: 12, color: '#64748b' }}>Purchase Cost ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost: parseFloat(e.target.value) || 0})} /></div>
-                  <div><label style={{ fontSize: 12, color: '#64748b' }}>Current Value ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue: parseFloat(e.target.value) || 0})} /></div>
+                  <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Purchase Cost ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost: parseFloat(e.target.value) || 0})} /></div>
+                  <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Current Value ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue: parseFloat(e.target.value) || 0})} /></div>
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>
+                <label style={{ fontSize: 13, color: 'var(--text-detail)', display: 'block', marginBottom: 8 }}>
                   Photos ({newAsset.photos?.length || 0}/5)
                   {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
                 </label>
@@ -1674,7 +1680,7 @@ const AssetManager = ({ user, onLogout }) => {
                     
                     setIsUploadingPhotos(false);
                     e.target.value = '';
-                  }} style={{ color: '#94a3b8', fontSize: 13 }} />
+                  }} style={{ color: 'var(--text-detail)', fontSize: 13 }} />
                 )}
                 {newAsset.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -1730,11 +1736,11 @@ const AssetManager = ({ user, onLogout }) => {
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>
+                <label style={{ fontSize: 13, color: 'var(--text-detail)', display: 'block', marginBottom: 8 }}>
                   Photos ({editingAsset.photos?.length || 0}/5)
                   {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
                 </label>
-                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: '#94a3b8', fontSize: 13 }} />}
+                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: 'var(--text-detail)', fontSize: 13 }} />}
                 {editingAsset.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                     {editingAsset.photos.map(p => (
@@ -1838,7 +1844,7 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => setShowBulkCategory(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom: 16 }}>🏷️ Change Category for {selectedAssets.length} Assets</h2>
-            <p style={{ color: '#64748b', marginBottom: 16, fontSize: 13 }}>Select a new category for the selected assets:</p>
+            <p style={{ color: 'var(--text-detail)', marginBottom: 16, fontSize: 13 }}>Select a new category for the selected assets:</p>
             <select className="input-field" value={bulkCategoryTo} onChange={e => setBulkCategoryTo(e.target.value)} style={{ marginBottom: 20 }}>
               <option value="">Select Category</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1877,7 +1883,7 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => { setShowNotesModal(null); setNewNote(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom: 8 }}>📝 Notes</h2>
-            <p style={{ color: '#64748b', marginBottom: 20 }}>{showNotesModal.name}</p>
+            <p style={{ color: 'var(--text-detail)', marginBottom: 20 }}>{showNotesModal.name}</p>
             {canEdit && (
               <div style={{ marginBottom: 20 }}>
                 <textarea className="input-field" placeholder="Add a note..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={3} style={{ resize: 'vertical' }} />
@@ -1886,12 +1892,12 @@ const AssetManager = ({ user, onLogout }) => {
             )}
             <div style={{ maxHeight: 300, overflowY: 'auto' }}>
               {(!showNotesModal.notes || showNotesModal.notes.length === 0) ? (
-                <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>No notes yet</p>
+                <p style={{ color: 'var(--text-detail)', textAlign: 'center', padding: 20 }}>No notes yet</p>
               ) : showNotesModal.notes.map(n => (
                 <div key={n.id} style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12, marginBottom: 8, borderLeft: '3px solid #fbbf24' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: '#64748b' }}>{new Date(n.created_at).toLocaleString()}{n.created_by && ` • ${n.created_by}`}</span>
-                    {canEdit && <button onClick={() => handleDeleteNote(n.id)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>✕</button>}
+                    <span style={{ fontSize: 11, color: 'var(--text-detail)' }}>{new Date(n.created_at).toLocaleString()}{n.created_by && ` • ${n.created_by}`}</span>
+                    {canEdit && <button onClick={() => handleDeleteNote(n.id)} style={{ background: 'none', border: 'none', color: 'var(--text-detail)', cursor: 'pointer' }}>✕</button>}
                   </div>
                   <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{n.text}</p>
                 </div>
@@ -1912,7 +1918,7 @@ const AssetManager = ({ user, onLogout }) => {
                 <div key={p.id} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(148,163,184,0.2)', position: 'relative' }}>
                   <img src={p.url} style={{ width: '100%', height: 150, objectFit: 'cover', cursor: 'pointer' }} onClick={() => setFullscreenPhoto(p)} />
                   <div style={{ padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-detail)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
                     <a href={p.url} download={p.name} style={{ color: '#60a5fa', fontSize: 11, textDecoration: 'none' }}>⬇</a>
                     {canEdit && <button onClick={() => { handleDeletePhoto(showPhotoViewer.id, p.id); setShowPhotoViewer({...showPhotoViewer, photos: showPhotoViewer.photos.filter(x => x.id !== p.id)}); }} style={{ background: 'rgba(239,68,68,0.2)', border: 'none', color: '#f87171', fontSize: 11, padding: '2px 6px', borderRadius: 4, cursor: 'pointer' }}>🗑</button>}
                   </div>
@@ -1956,7 +1962,7 @@ const AssetManager = ({ user, onLogout }) => {
             
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(30,41,59,0.9)', padding: '12px 20px', borderRadius: 10 }}>
               {showPhotoViewer && showPhotoViewer.photos?.length > 1 && (
-                <span style={{ color: '#64748b', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-detail)', fontSize: 13 }}>
                   {showPhotoViewer.photos.findIndex(p => p.id === fullscreenPhoto.id) + 1} / {showPhotoViewer.photos.length}
                 </span>
               )}
