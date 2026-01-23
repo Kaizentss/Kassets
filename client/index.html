@@ -692,7 +692,7 @@ const AssetManager = ({ user, onLogout }) => {
       await api('/locations', { method: 'POST', body: JSON.stringify(newLocation) });
       setShowAddLocation(false);
       setNewLocation({ name: '', address: '' });
-      loadAllData();
+      await loadAllData();
     } catch (e) { alert(e.message); }
   };
 
@@ -717,7 +717,7 @@ const AssetManager = ({ user, onLogout }) => {
     try {
       await api('/categories', { method: 'POST', body: JSON.stringify({ name: newCategory.trim() }) });
       setNewCategory('');
-      loadAllData();
+      await loadAllData();
     } catch (e) { alert(e.message); }
   };
 
