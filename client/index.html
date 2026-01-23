@@ -473,10 +473,14 @@ const AssetManager = ({ user, onLogout }) => {
   const filteredAssets = assets.filter(a => {
     const matchLoc = filterLocation === 'all' || a.locationId === parseInt(filterLocation);
     const matchCat = filterCategory === 'all' || a.category === filterCategory;
-    const matchSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.partNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    const locationName = locations.find(l => l.id === a.locationId)?.name || '';
+    const searchLower = searchTerm.toLowerCase();
+    const matchSearch = a.name.toLowerCase().includes(searchLower) ||
+      a.category?.toLowerCase().includes(searchLower) ||
+      a.serialNumber?.toLowerCase().includes(searchLower) ||
+      a.partNumber?.toLowerCase().includes(searchLower) ||
+      a.description?.toLowerCase().includes(searchLower) ||
+      locationName.toLowerCase().includes(searchLower);
     return matchLoc && matchCat && matchSearch;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
