@@ -445,8 +445,8 @@ const AssetManager = ({ user, onLogout }) => {
         currentValue: a.current_value, quantity: a.quantity, depreciationRate: a.depreciation_rate,
         locationId: a.location_id, photos: a.photos || [], notes: a.notes || []
       })));
-      setLocations(locsData.map(l => ({ id: l.id, name: l.name, address: l.address })));
-      setCategories(catsData.map(c => c.name));
+      setLocations(locsData.map(l => ({ id: l.id, name: l.name, address: l.address })).sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories(catsData.map(c => c.name).sort((a, b) => a.localeCompare(b)));
       setCompanyName(settings.company_name || '');
     } catch (e) { console.error('Load error:', e); }
   };
