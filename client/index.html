@@ -22,9 +22,6 @@
       --text-primary: #e2e8f0;
       --text-secondary: #94a3b8;
       --text-muted: #64748b;
-      --text-detail: #94a3b8;
-      --badge-blue: #60a5fa;
-      --badge-green: #4ade80;
       --accent-blue: #3b82f6;
       --accent-green: #34d399;
       --accent-red: #f87171;
@@ -44,12 +41,9 @@
       --bg-input: rgba(241, 245, 249, 0.9);
       --border-color: rgba(100, 116, 139, 0.2);
       --border-color-hover: rgba(59, 130, 246, 0.4);
-      --text-primary: #0f172a;
-      --text-secondary: #1e293b;
-      --text-muted: #334155;
-      --text-detail: #475569;
-      --badge-blue: #1d4ed8;
-      --badge-green: #15803d;
+      --text-primary: #1e293b;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
       --accent-blue: #2563eb;
       --accent-green: #059669;
       --accent-red: #dc2626;
@@ -82,8 +76,8 @@
     .tab-btn { padding: 12px 20px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-bottom: 2px solid transparent; font-family: inherit; }
     .tab-btn:hover { color: var(--text-secondary); }
     .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
-    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(59, 130, 246, 0.2); color: var(--badge-blue); }
-    .location-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(34, 197, 94, 0.2); color: var(--badge-green); }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .location-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(34, 197, 94, 0.2); color: #4ade80; }
     .asset-row { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; transition: all 0.3s ease; }
     .asset-row:hover { background: var(--bg-tertiary); border-color: var(--border-color-hover); }
     .asset-row.selected { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
@@ -172,10 +166,57 @@ const LoginPage = ({ onLogin, theme, toggleTheme }) => {
 
   const playCoinSound = () => {
     try {
-      // Use a real coin sound effect
-      const audio = new Audio('https://cdn.freesound.org/previews/748/748143_1660585-lq.mp3');
-      audio.volume = 0.5;
-      audio.play();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Create multiple coin "clinks" for bag of coins effect
+      for (let i = 0; i < 10; i++) {
+        const delay = i * 0.06 + Math.random() * 0.04;
+        
+        const osc = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        const baseFreq = 1800 + Math.random() * 2500;
+        osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime + delay);
+        osc.frequency.exponentialRampToValueAtTime(500, audioCtx.currentTime + delay + 0.12);
+        osc.type = 'sine';
+        
+        osc2.frequency.setValueAtTime(baseFreq * 1.5, audioCtx.currentTime + delay);
+        osc2.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + delay + 0.1);
+        osc2.type = 'triangle';
+        
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime + delay);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.2);
+        
+        osc.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.start(audioCtx.currentTime + delay);
+        osc2.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + 0.25);
+        osc2.stop(audioCtx.currentTime + delay + 0.25);
+      }
+      
+      // Bag rustle noise
+      const bufferSize = audioCtx.sampleRate * 0.4;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.value = 600;
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(audioCtx.destination);
+      noise.start();
     } catch (e) {
       console.log('Audio error:', e);
     }
@@ -336,7 +377,7 @@ const UserManagement = ({ currentUser, onClose }) => {
                   <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...roleColors[u.role] }}>{u.role.toUpperCase()}</span>
                   {!u.is_active && <span style={{ color: '#f87171', fontSize: 12 }}>INACTIVE</span>}
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-detail)' }}>@{u.username}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>@{u.username}</p>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setEditUser({...u})}>Edit</button>
@@ -408,8 +449,6 @@ const AssetManager = ({ user, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
-  const [isAddingAsset, setIsAddingAsset] = useState(false);
-  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
@@ -420,7 +459,6 @@ const AssetManager = ({ user, onLogout }) => {
   const [bulkTransferTo, setBulkTransferTo] = useState('');
   const [bulkCategoryTo, setBulkCategoryTo] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
-  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showNotesModal, setShowNotesModal] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
@@ -451,8 +489,8 @@ const AssetManager = ({ user, onLogout }) => {
         currentValue: a.current_value, quantity: a.quantity, depreciationRate: a.depreciation_rate,
         locationId: a.location_id, photos: a.photos || [], notes: a.notes || []
       })));
-      setLocations(locsData.map(l => ({ id: l.id, name: l.name, address: l.address })).sort((a, b) => a.name.localeCompare(b.name)));
-      setCategories(catsData.map(c => c.name).sort((a, b) => a.localeCompare(b)));
+      setLocations(locsData.map(l => ({ id: l.id, name: l.name, address: l.address })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setCategories(catsData.map(c => c.name).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })));
       setCompanyName(settings.company_name || '');
     } catch (e) { console.error('Load error:', e); }
   };
@@ -470,24 +508,29 @@ const AssetManager = ({ user, onLogout }) => {
     }), { totalPurchaseCost: 0, totalCurrentValue: 0, totalAssets: 0 });
   };
 
+  // Natural sort function for alphanumeric strings (Beta 2 before Beta 18)
+  const naturalSort = (a, b) => {
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
   const filteredAssets = assets.filter(a => {
     const matchLoc = filterLocation === 'all' || a.locationId === parseInt(filterLocation);
     const matchCat = filterCategory === 'all' || a.category === filterCategory;
-    const locationName = locations.find(l => l.id === a.locationId)?.name || '';
     const searchLower = searchTerm.toLowerCase();
-    const matchSearch = a.name.toLowerCase().includes(searchLower) ||
-      a.category?.toLowerCase().includes(searchLower) ||
-      a.serialNumber?.toLowerCase().includes(searchLower) ||
-      a.partNumber?.toLowerCase().includes(searchLower) ||
-      a.description?.toLowerCase().includes(searchLower) ||
+    const locationName = locations.find(l => l.id === a.locationId)?.name || '';
+    const matchSearch = !searchTerm || 
+      (a.name || '').toLowerCase().includes(searchLower) ||
+      (a.category || '').toLowerCase().includes(searchLower) ||
+      (a.serialNumber || '').toLowerCase().includes(searchLower) ||
+      (a.partNumber || '').toLowerCase().includes(searchLower) ||
+      (a.description || '').toLowerCase().includes(searchLower) ||
       locationName.toLowerCase().includes(searchLower);
     return matchLoc && matchCat && matchSearch;
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort(naturalSort);
 
   // Asset CRUD
   const handleAddAsset = async () => {
     if (!newAsset.name) return alert('Name required');
-    setIsAddingAsset(true);
     try {
       const assetData = {
         ...newAsset,
@@ -499,30 +542,20 @@ const AssetManager = ({ user, onLogout }) => {
       
       const result = await api('/assets', { method: 'POST', body: JSON.stringify(assetData) });
       
-      // Upload photos if any were added (in parallel for speed)
+      // Upload photos if any were added
       if (newAsset.photos?.length > 0) {
-        await Promise.all(newAsset.photos.map(photo => 
-          api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) })
-        ));
+        for (const photo of newAsset.photos) {
+          await api('/assets/' + result.id + '/photos', { method: 'POST', body: JSON.stringify({ url: photo.url, name: photo.name }) });
+        }
       }
       
-      await loadAllData();
       setShowAddAsset(false);
-      setIsAddingAsset(false);
-      // Keep the current location filter when resetting the form
-      const keepLocationId = filterLocation !== 'all' ? filterLocation : '';
-      setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: keepLocationId, description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
-    } catch (e) { 
-      setIsAddingAsset(false);
-      alert(e.message); 
-    }
+      setNewAsset({ name: '', category: '', purchaseDate: '', purchaseCost: 0, currentValue: 0, quantity: 1, locationId: '', description: '', serialNumber: '', partNumber: '', depreciationRate: 10, photos: [] });
+      loadAllData();
+    } catch (e) { alert(e.message); }
   };
 
   const handleUpdateAsset = async () => {
-    // Prevent double-clicks
-    if (isSavingAsset) return;
-    setIsSavingAsset(true);
-    
     try {
       // Find original asset to compare changes
       const originalAsset = assets.find(a => a.id === editingAsset.id);
@@ -535,28 +568,22 @@ const AssetManager = ({ user, onLogout }) => {
       const userName = user.displayName || user.username;
       
       // Check for quantity change
-      if (originalAsset) {
-        const oldQty = Number(originalAsset.quantity) || 0;
-        const newQty = Number(editingAsset.quantity) || 0;
-        if (oldQty !== newQty) {
-          const diff = newQty - oldQty;
-          if (diff < 0) {
-            autoNotes.push(`📦 QUANTITY DEDUCTED: ${Math.abs(diff)} unit(s) removed (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
-          } else {
-            autoNotes.push(`📦 QUANTITY ADDED: ${diff} unit(s) added (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
-          }
+      if (originalAsset && parseInt(editingAsset.quantity) !== parseInt(originalAsset.quantity)) {
+        const oldQty = parseInt(originalAsset.quantity);
+        const newQty = parseInt(editingAsset.quantity);
+        const diff = newQty - oldQty;
+        if (diff < 0) {
+          autoNotes.push(`📦 QUANTITY DEDUCTED: ${Math.abs(diff)} unit(s) removed (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
+        } else {
+          autoNotes.push(`📦 QUANTITY ADDED: ${diff} unit(s) added (${oldQty} → ${newQty}) by ${userName} on ${timestamp}`);
         }
       }
       
       // Check for location change
-      if (originalAsset) {
-        const oldLocId = Number(originalAsset.locationId) || 0;
-        const newLocId = Number(editingAsset.locationId) || 0;
-        if (oldLocId !== newLocId) {
-          const oldLocation = locations.find(l => l.id === originalAsset.locationId)?.name || 'Unknown';
-          const newLocation = locations.find(l => l.id === editingAsset.locationId)?.name || 'Unknown';
-          autoNotes.push(`📍 LOCATION CHANGED: Moved from "${oldLocation}" to "${newLocation}" by ${userName} on ${timestamp}`);
-        }
+      if (originalAsset && parseInt(editingAsset.locationId) !== parseInt(originalAsset.locationId)) {
+        const oldLocation = locations.find(l => l.id === parseInt(originalAsset.locationId))?.name || 'Unknown';
+        const newLocation = locations.find(l => l.id === parseInt(editingAsset.locationId))?.name || 'Unknown';
+        autoNotes.push(`📍 LOCATION CHANGED: Moved from "${oldLocation}" to "${newLocation}" by ${userName} on ${timestamp}`);
       }
       
       // Update the asset
@@ -568,18 +595,14 @@ const AssetManager = ({ user, onLogout }) => {
         locationId: editingAsset.locationId
       })});
       
-      // Add automatic notes if there were changes (only once each)
+      // Add automatic notes if there were changes
       for (const noteText of autoNotes) {
         await api('/assets/' + editingAsset.id + '/notes', { method: 'POST', body: JSON.stringify({ text: noteText }) });
       }
       
-      await loadAllData();
       setEditingAsset(null);
-      setIsSavingAsset(false);
-    } catch (e) { 
-      setIsSavingAsset(false);
-      alert(e.message); 
-    }
+      loadAllData();
+    } catch (e) { alert(e.message); }
   };
 
   const handleDeleteAsset = async (id) => {
@@ -622,48 +645,6 @@ const AssetManager = ({ user, onLogout }) => {
     } catch (e) { alert(e.message); }
   };
 
-  const handleRotatePhoto = async (assetId, photo) => {
-    try {
-      // Create a canvas to rotate the image
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = photo.url;
-      });
-      
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Swap width and height for 90 degree rotation
-      canvas.width = img.height;
-      canvas.height = img.width;
-      
-      // Rotate 90 degrees clockwise
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(90 * Math.PI / 180);
-      ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      
-      // Get rotated image as base64
-      const rotatedUrl = canvas.toDataURL('image/jpeg', 0.9);
-      
-      // Delete old photo and add new rotated one
-      await api('/assets/' + assetId + '/photos/' + photo.id, { method: 'DELETE' });
-      await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: rotatedUrl, name: photo.name }) });
-      
-      // Refresh
-      await loadAllData();
-      if (editingAsset) {
-        const updated = (await api('/assets')).find(a => a.id === assetId);
-        if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
-      }
-    } catch (e) { 
-      alert('Could not rotate photo: ' + e.message); 
-    }
-  };
-
   const handleBulkTransfer = async () => {
     if (!bulkTransferTo) return;
     try {
@@ -702,7 +683,7 @@ const AssetManager = ({ user, onLogout }) => {
       await api('/locations', { method: 'POST', body: JSON.stringify(newLocation) });
       setShowAddLocation(false);
       setNewLocation({ name: '', address: '' });
-      await loadAllData();
+      loadAllData();
     } catch (e) { alert(e.message); }
   };
 
@@ -727,7 +708,7 @@ const AssetManager = ({ user, onLogout }) => {
     try {
       await api('/categories', { method: 'POST', body: JSON.stringify({ name: newCategory.trim() }) });
       setNewCategory('');
-      await loadAllData();
+      loadAllData();
     } catch (e) { alert(e.message); }
   };
 
@@ -751,19 +732,7 @@ const AssetManager = ({ user, onLogout }) => {
       try {
         await api('/categories/' + found.id, { method: 'DELETE' });
         loadAllData();
-      } catch (e) { 
-        // If assets are attached, ask if user wants to force delete
-        if (e.message.includes('assets use this category')) {
-          if (confirm(e.message + '\n\nForce delete? Assets will be moved to "Other" category.')) {
-            try {
-              await api('/categories/' + found.id + '?force=true', { method: 'DELETE' });
-              loadAllData();
-            } catch (e2) { alert(e2.message); }
-          }
-        } else {
-          alert(e.message);
-        }
-      }
+      } catch (e) { alert(e.message); }
     }
   };
 
@@ -827,51 +796,24 @@ const AssetManager = ({ user, onLogout }) => {
       alert(`Only uploading ${maxAllowed} photo(s). Maximum 5 photos per asset.`);
     }
     
-    setIsUploadingPhotos(true);
-    
-    // Compress image function
-    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
-      return new Promise(resolve => {
+    for (const file of filesToUpload) {
+      await new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (ev) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-          };
-          img.src = ev.target.result;
+        reader.onload = async () => {
+          try {
+            await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: reader.result, name: file.name }) });
+          } catch (err) { console.error(err); }
+          resolve();
         };
         reader.readAsDataURL(file);
       });
-    };
-    
-    try {
-      // Compress and upload all photos in parallel
-      await Promise.all(filesToUpload.map(async (file) => {
-        const compressedUrl = await compressImage(file);
-        await api('/assets/' + assetId + '/photos', { method: 'POST', body: JSON.stringify({ url: compressedUrl, name: file.name }) });
-      }));
-      
-      await loadAllData();
-      if (editingAsset) {
-        const updated = (await api('/assets')).find(a => a.id === assetId);
-        if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
-      }
-    } catch (err) {
-      alert('Photo upload failed. Please try again.');
     }
     
-    setIsUploadingPhotos(false);
+    loadAllData();
+    if (editingAsset) {
+      const updated = (await api('/assets')).find(a => a.id === assetId);
+      if (updated) setEditingAsset({ ...editingAsset, photos: updated.photos || [] });
+    }
     e.target.value = ''; // Reset input
   };
 
@@ -955,9 +897,9 @@ const AssetManager = ({ user, onLogout }) => {
           </button>
           {isAdmin && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowUserMgmt(true)}>Users</button>}
           <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowSettings(true)}>⚙️</button>
-          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
-          {canEdit && <button className="btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
-          {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => { setNewAsset({...newAsset, locationId: filterLocation !== 'all' ? filterLocation : ''}); setShowAddAsset(true); }}>+ Asset</button>}
+          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowManageCategories(true)}>Categories</button>}
+          {canEdit && <button className="btn-secondary hide-mobile" style={{ padding: '8px 12px', fontSize: 12 }} onClick={() => setShowAddLocation(true)}>+ Location</button>}
+          {canEdit && <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 12 }} onClick={() => setShowAddAsset(true)}>+ Asset</button>}
           <button className="btn-danger" style={{ padding: '8px 12px', fontSize: 12 }} onClick={onLogout}>Logout</button>
         </div>
       </header>
@@ -1120,7 +1062,7 @@ const AssetManager = ({ user, onLogout }) => {
             
             <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
               {filteredAssets.length === 0 ? (
-                <div className="glass-card" style={{ padding: 40, textAlign: 'center' }}><p style={{ color: 'var(--text-detail)' }}>No assets found</p></div>
+                <div className="glass-card" style={{ padding: 40, textAlign: 'center' }}><p style={{ color: '#64748b' }}>No assets found</p></div>
               ) : filteredAssets.map(asset => (
                 <div key={asset.id} className={`asset-row ${selectedAssets.includes(asset.id) ? 'selected' : ''}`}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1144,7 +1086,7 @@ const AssetManager = ({ user, onLogout }) => {
                       )}
                       <div>
                         <h4 style={{ margin: 0, fontSize: 15 }}>{asset.name}</h4>
-                        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-detail)' }}>{asset.partNumber && `P/N: ${asset.partNumber} • `}{asset.serialNumber && `SN: ${asset.serialNumber} • `}Qty: {asset.quantity}{asset.description && ` • ${asset.description}`}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{asset.partNumber && `P/N: ${asset.partNumber} • `}{asset.serialNumber && `SN: ${asset.serialNumber} • `}Qty: {asset.quantity}{asset.description && ` • ${asset.description}`}</p>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1173,15 +1115,15 @@ const AssetManager = ({ user, onLogout }) => {
               return (
                 <div key={loc.id} className="glass-card" style={{ padding: 24 }}>
                   <h3 style={{ margin: '0 0 8px' }}>{loc.name}</h3>
-                  <p style={{ color: 'var(--text-detail)', fontSize: 13, margin: '0 0 16px' }}>{loc.address || 'No address'}</p>
+                  <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 16px' }}>{loc.address || 'No address'}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12 }}>
-                      <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0 }}>Assets</p>
+                      <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>Assets</p>
                       <p style={{ fontSize: 22, fontWeight: 700, margin: '4px 0 0' }}>{locAssets.length}</p>
                     </div>
                     {isAdmin && (
                       <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12 }}>
-                        <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0 }}>Value</p>
+                        <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>Value</p>
                         <p style={{ fontSize: 16, fontWeight: 700, margin: '4px 0 0', color: '#34d399', fontFamily: "'JetBrains Mono', monospace" }}>{formatCurrency(locValue)}</p>
                       </div>
                     )}
@@ -1204,7 +1146,7 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <h2 style={{ margin: 0 }}>{companyName || 'Kassets'} - Balance Sheet</h2>
-                <p style={{ color: 'var(--text-detail)', marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p style={{ color: '#64748b', marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
               <button className="btn-gold" onClick={() => {
                 // Generate professional PDF balance sheet
@@ -1374,15 +1316,15 @@ const AssetManager = ({ user, onLogout }) => {
             {/* Preview on screen */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 32 }}>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #ffd700' }}>
-                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Total Assets (at cost)</p>
+                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Total Assets (at cost)</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace" }}>{formatCurrency(totals.totalPurchaseCost)}</p>
               </div>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #ef4444' }}>
-                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Accumulated Depreciation</p>
+                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Accumulated Depreciation</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace", color: '#f87171' }}>({formatCurrency(totals.totalPurchaseCost - totals.totalCurrentValue)})</p>
               </div>
               <div style={{ background: 'rgba(15,23,42,0.5)', padding: 16, borderRadius: 12, borderLeft: '4px solid #22c55e' }}>
-                <p style={{ color: 'var(--text-detail)', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Net Book Value</p>
+                <p style={{ color: '#64748b', fontSize: 11, margin: 0, textTransform: 'uppercase' }}>Net Book Value</p>
                 <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0 0', fontFamily: "'JetBrains Mono', monospace", color: '#34d399' }}>{formatCurrency(totals.totalCurrentValue)}</p>
               </div>
             </div>
@@ -1393,11 +1335,11 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CATEGORY</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>COUNT</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CURRENT VALUE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>DEPRECIATION</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>CATEGORY</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>COUNT</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>CURRENT VALUE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>DEPRECIATION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1427,11 +1369,11 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>LOCATION</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>ASSET COUNT</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>CURRENT VALUE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>% OF TOTAL</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>LOCATION</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>ASSET COUNT</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>CURRENT VALUE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>% OF TOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1461,20 +1403,20 @@ const AssetManager = ({ user, onLogout }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
                 <thead>
                   <tr style={{ background: 'rgba(15,23,42,0.8)' }}>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>ASSET NAME</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>SERIAL #</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>LOCATION</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>QTY</th>
-                    <th style={{ textAlign: 'left', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>PURCHASE DATE</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>UNIT COST</th>
-                    <th style={{ textAlign: 'right', padding: 12, color: 'var(--text-detail)', fontSize: 11 }}>TOTAL VALUE</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>ASSET NAME</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>SERIAL #</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>LOCATION</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>QTY</th>
+                    <th style={{ textAlign: 'left', padding: 12, color: '#94a3b8', fontSize: 11 }}>PURCHASE DATE</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>UNIT COST</th>
+                    <th style={{ textAlign: 'right', padding: 12, color: '#94a3b8', fontSize: 11 }}>TOTAL VALUE</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...assets].sort((a, b) => a.name.localeCompare(b.name)).map(a => (
                     <tr key={a.id} style={{ borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
                       <td style={{ padding: 12 }}>{a.name}</td>
-                      <td style={{ padding: 12, color: 'var(--text-detail)', fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{a.serialNumber || '-'}</td>
+                      <td style={{ padding: 12, color: '#64748b', fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{a.serialNumber || '-'}</td>
                       <td style={{ padding: 12 }}>{getLocationName(a.locationId)}</td>
                       <td style={{ padding: 12, textAlign: 'right' }}>{a.quantity}</td>
                       <td style={{ padding: 12 }}>{a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</td>
@@ -1486,7 +1428,7 @@ const AssetManager = ({ user, onLogout }) => {
               </table>
             </div>
             
-            <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(148,163,184,0.2)', textAlign: 'center', color: 'var(--text-detail)', fontSize: 12 }}>
+            <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(148,163,184,0.2)', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
               Generated by Kassets Asset Management System
             </div>
           </div>
@@ -1505,13 +1447,13 @@ const AssetManager = ({ user, onLogout }) => {
             <h2 style={{ marginBottom: 20 }}>⚙️ Settings</h2>
             
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)' }}>Company Name</label>
+              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8' }}>Company Name</label>
               <input className="input-field" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enter company name" />
             </div>
             
             <div style={{ borderTop: '1px solid rgba(148,163,184,0.2)', paddingTop: 20, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, marginBottom: 12, color: 'var(--text-detail)' }}>🔐 Account</h3>
-              <p style={{ fontSize: 13, color: 'var(--text-detail)', marginBottom: 12 }}>Logged in as: <strong style={{ color: '#e2e8f0' }}>{user.displayName || user.username}</strong></p>
+              <h3 style={{ fontSize: 16, marginBottom: 12, color: '#94a3b8' }}>🔐 Account</h3>
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Logged in as: <strong style={{ color: '#e2e8f0' }}>{user.displayName || user.username}</strong></p>
               <button className="btn-secondary" style={{ width: '100%' }} onClick={() => { setShowSettings(false); setShowChangePassword(true); }}>
                 Change Password
               </button>
@@ -1532,17 +1474,17 @@ const AssetManager = ({ user, onLogout }) => {
             <h2 style={{ marginBottom: 20 }}>🔐 Change Password</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>Current Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Current Password</label>
               <input type="password" className="input-field" value={passwordData.current} onChange={e => setPasswordData({...passwordData, current: e.target.value})} placeholder="Enter current password" />
             </div>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>New Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>New Password</label>
               <input type="password" className="input-field" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} placeholder="Enter new password (min 6 characters)" />
             </div>
             
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-detail)', fontSize: 14 }}>Confirm New Password</label>
+              <label style={{ display: 'block', marginBottom: 8, color: '#94a3b8', fontSize: 14 }}>Confirm New Password</label>
               <input type="password" className="input-field" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} placeholder="Confirm new password" />
             </div>
             
@@ -1581,7 +1523,7 @@ const AssetManager = ({ user, onLogout }) => {
                     </div>
                   ) : (
                     <>
-                      <span>{cat} <span style={{ color: 'var(--text-detail)', fontSize: 12 }}>({assets.filter(a => a.category === cat).length} assets)</span></span>
+                      <span>{cat} <span style={{ color: '#64748b', fontSize: 12 }}>({assets.filter(a => a.category === cat).length} assets)</span></span>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setEditingCategory(cat); setEditingCategoryName(cat); }}>Edit</button>
                         <button className="btn-danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleDeleteCategory(cat)}>Delete</button>
@@ -1619,22 +1561,19 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
               <input className="input-field" placeholder="Description" value={newAsset.description} onChange={e => setNewAsset({...newAsset, description: e.target.value})} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Purchase Date</label><input type="date" className="input-field" value={newAsset.purchaseDate} onChange={e => setNewAsset({...newAsset, purchaseDate: e.target.value})} /></div>
-                <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Quantity</label><input type="number" className="input-field" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: parseInt(e.target.value) || 1})} /></div>
+                <div><label style={{ fontSize: 12, color: '#64748b' }}>Purchase Date</label><input type="date" className="input-field" value={newAsset.purchaseDate} onChange={e => setNewAsset({...newAsset, purchaseDate: e.target.value})} /></div>
+                <div><label style={{ fontSize: 12, color: '#64748b' }}>Quantity</label><input type="number" className="input-field" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: parseInt(e.target.value) || 1})} /></div>
               </div>
               {isAdmin && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Purchase Cost ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost: parseFloat(e.target.value) || 0})} /></div>
-                  <div><label style={{ fontSize: 12, color: 'var(--text-detail)' }}>Current Value ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue: parseFloat(e.target.value) || 0})} /></div>
+                  <div><label style={{ fontSize: 12, color: '#64748b' }}>Purchase Cost ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost: parseFloat(e.target.value) || 0})} /></div>
+                  <div><label style={{ fontSize: 12, color: '#64748b' }}>Current Value ($)</label><input type="number" className="input-field" step="0.01" min="0" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue: parseFloat(e.target.value) || 0})} /></div>
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: 'var(--text-detail)', display: 'block', marginBottom: 8 }}>
-                  Photos ({newAsset.photos?.length || 0}/5)
-                  {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
-                </label>
+                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>Photos ({newAsset.photos?.length || 0}/5)</label>
                 {(newAsset.photos?.length || 0) < 5 && (
-                  <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={async (e) => {
+                  <input type="file" accept="image/*" multiple onChange={async (e) => {
                     const files = Array.from(e.target.files);
                     const currentPhotos = newAsset.photos || [];
                     const available = 5 - currentPhotos.length;
@@ -1642,49 +1581,18 @@ const AssetManager = ({ user, onLogout }) => {
                       alert(`Can only add ${available} more photo(s)`);
                     }
                     const toUpload = files.slice(0, available);
-                    
-                    setIsUploadingPhotos(true);
-                    
-                    // Compress image function
-                    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
-                      return new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                          const img = new Image();
-                          img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            let width = img.width;
-                            let height = img.height;
-                            if (width > maxWidth) {
-                              height = (height * maxWidth) / width;
-                              width = maxWidth;
-                            }
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, width, height);
-                            resolve(canvas.toDataURL('image/jpeg', quality));
-                          };
-                          img.src = ev.target.result;
-                        };
+                    const newPhotos = [];
+                    for (const file of toUpload) {
+                      const reader = new FileReader();
+                      const url = await new Promise(resolve => {
+                        reader.onload = (ev) => resolve(ev.target.result);
                         reader.readAsDataURL(file);
                       });
-                    };
-                    
-                    try {
-                      // Compress all photos in parallel
-                      const newPhotos = await Promise.all(toUpload.map(async (file) => {
-                        const url = await compressImage(file);
-                        return { id: Date.now() + Math.random(), url, name: file.name };
-                      }));
-                      setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
-                    } catch (err) {
-                      alert('Failed to process photos. Please try again.');
+                      newPhotos.push({ id: Date.now() + Math.random(), url, name: file.name });
                     }
-                    
-                    setIsUploadingPhotos(false);
+                    setNewAsset({...newAsset, photos: [...currentPhotos, ...newPhotos]});
                     e.target.value = '';
-                  }} style={{ color: 'var(--text-detail)', fontSize: 13 }} />
+                  }} style={{ color: '#94a3b8', fontSize: 13 }} />
                 )}
                 {newAsset.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -1699,10 +1607,8 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setShowAddAsset(false)} disabled={isAddingAsset}>Cancel</button>
-              <button className="btn-primary" onClick={handleAddAsset} disabled={isAddingAsset || isUploadingPhotos}>
-                {isAddingAsset ? '⏳ Adding...' : 'Add Asset'}
-              </button>
+              <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleAddAsset}>Add Asset</button>
             </div>
           </div>
         </div>
@@ -1740,27 +1646,13 @@ const AssetManager = ({ user, onLogout }) => {
                 </div>
               )}
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 13, color: 'var(--text-detail)', display: 'block', marginBottom: 8 }}>
-                  Photos ({editingAsset.photos?.length || 0}/5)
-                  {isUploadingPhotos && <span style={{ marginLeft: 8, color: '#ffd700' }}>⏳ Uploading...</span>}
-                </label>
-                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple disabled={isUploadingPhotos} onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: 'var(--text-detail)', fontSize: 13 }} />}
+                <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 8 }}>Photos ({editingAsset.photos?.length || 0}/5)</label>
+                {(editingAsset.photos?.length || 0) < 5 && <input type="file" accept="image/*" multiple onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ color: '#94a3b8', fontSize: 13 }} />}
                 {editingAsset.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                     {editingAsset.photos.map(p => (
                       <div key={p.id} style={{ position: 'relative' }}>
                         <img src={p.url} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6 }} />
-                        <button 
-                          onClick={() => handleRotatePhoto(editingAsset.id, p)}
-                          title="Rotate 90°"
-                          style={{ 
-                            position: 'absolute', top: -6, left: -6, 
-                            width: 20, height: 20, borderRadius: '50%', 
-                            background: '#3b82f6', border: 'none', 
-                            color: 'white', fontSize: 10, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}
-                        >↻</button>
                         <button 
                           onClick={() => handleDeletePhoto(editingAsset.id, p.id)} 
                           style={{ 
@@ -1778,10 +1670,8 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setEditingAsset(null)} disabled={isSavingAsset}>Cancel</button>
-              <button className="btn-primary" onClick={handleUpdateAsset} disabled={isSavingAsset}>
-                {isSavingAsset ? '⏳ Saving...' : 'Save'}
-              </button>
+              <button className="btn-secondary" onClick={() => setEditingAsset(null)}>Cancel</button>
+              <button className="btn-primary" onClick={handleUpdateAsset}>Save</button>
             </div>
           </div>
         </div>
@@ -1848,7 +1738,7 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => setShowBulkCategory(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom: 16 }}>🏷️ Change Category for {selectedAssets.length} Assets</h2>
-            <p style={{ color: 'var(--text-detail)', marginBottom: 16, fontSize: 13 }}>Select a new category for the selected assets:</p>
+            <p style={{ color: '#64748b', marginBottom: 16, fontSize: 13 }}>Select a new category for the selected assets:</p>
             <select className="input-field" value={bulkCategoryTo} onChange={e => setBulkCategoryTo(e.target.value)} style={{ marginBottom: 20 }}>
               <option value="">Select Category</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1887,7 +1777,7 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => { setShowNotesModal(null); setNewNote(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom: 8 }}>📝 Notes</h2>
-            <p style={{ color: 'var(--text-detail)', marginBottom: 20 }}>{showNotesModal.name}</p>
+            <p style={{ color: '#64748b', marginBottom: 20 }}>{showNotesModal.name}</p>
             {canEdit && (
               <div style={{ marginBottom: 20 }}>
                 <textarea className="input-field" placeholder="Add a note..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={3} style={{ resize: 'vertical' }} />
@@ -1896,12 +1786,12 @@ const AssetManager = ({ user, onLogout }) => {
             )}
             <div style={{ maxHeight: 300, overflowY: 'auto' }}>
               {(!showNotesModal.notes || showNotesModal.notes.length === 0) ? (
-                <p style={{ color: 'var(--text-detail)', textAlign: 'center', padding: 20 }}>No notes yet</p>
+                <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>No notes yet</p>
               ) : showNotesModal.notes.map(n => (
                 <div key={n.id} style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: 12, marginBottom: 8, borderLeft: '3px solid #fbbf24' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-detail)' }}>{new Date(n.created_at).toLocaleString()}{n.created_by && ` • ${n.created_by}`}</span>
-                    {canEdit && <button onClick={() => handleDeleteNote(n.id)} style={{ background: 'none', border: 'none', color: 'var(--text-detail)', cursor: 'pointer' }}>✕</button>}
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{new Date(n.created_at).toLocaleString()}{n.created_by && ` • ${n.created_by}`}</span>
+                    {canEdit && <button onClick={() => handleDeleteNote(n.id)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>✕</button>}
                   </div>
                   <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{n.text}</p>
                 </div>
@@ -1922,7 +1812,7 @@ const AssetManager = ({ user, onLogout }) => {
                 <div key={p.id} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(148,163,184,0.2)', position: 'relative' }}>
                   <img src={p.url} style={{ width: '100%', height: 150, objectFit: 'cover', cursor: 'pointer' }} onClick={() => setFullscreenPhoto(p)} />
                   <div style={{ padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-detail)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
+                    <span style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
                     <a href={p.url} download={p.name} style={{ color: '#60a5fa', fontSize: 11, textDecoration: 'none' }}>⬇</a>
                     {canEdit && <button onClick={() => { handleDeletePhoto(showPhotoViewer.id, p.id); setShowPhotoViewer({...showPhotoViewer, photos: showPhotoViewer.photos.filter(x => x.id !== p.id)}); }} style={{ background: 'rgba(239,68,68,0.2)', border: 'none', color: '#f87171', fontSize: 11, padding: '2px 6px', borderRadius: 4, cursor: 'pointer' }}>🗑</button>}
                   </div>
@@ -1966,7 +1856,7 @@ const AssetManager = ({ user, onLogout }) => {
             
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(30,41,59,0.9)', padding: '12px 20px', borderRadius: 10 }}>
               {showPhotoViewer && showPhotoViewer.photos?.length > 1 && (
-                <span style={{ color: 'var(--text-detail)', fontSize: 13 }}>
+                <span style={{ color: '#64748b', fontSize: 13 }}>
                   {showPhotoViewer.photos.findIndex(p => p.id === fullscreenPhoto.id) + 1} / {showPhotoViewer.photos.length}
                 </span>
               )}
