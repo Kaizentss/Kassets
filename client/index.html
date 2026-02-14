@@ -753,8 +753,8 @@ const AssetManager = ({ user, onLogout }) => {
     try {
       const [a,l,c,s] = await Promise.all([api('/assets'), api('/locations'), api('/categories'), api('/settings')]);
       setAssets(a.map(x => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number, partNumber:x.part_number, description:x.description, purchaseDate:x.purchase_date, purchaseCost:x.purchase_cost, currentValue:x.current_value, quantity:x.quantity, depreciationRate:x.depreciation_rate, locationId:x.location_id, photos:x.photos||[], notes:x.notes||[] })));
-      setLocations(l.map(x => ({ id:x.id, name:x.name, address:x.address })));
-      setCategories(c.map(x => x.name));
+      setLocations(l.map(x => ({ id:x.id, name:x.name, address:x.address })).sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' })));
+      setCategories(c.map(x => x.name).sort((a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' })));
       setCompanyName(s.company_name || '');
       if (s.brand_color) setBrandColor(s.brand_color);
       if (s.bg_color_1) setBgColor1(s.bg_color_1);
