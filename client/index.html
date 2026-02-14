@@ -928,10 +928,10 @@ const AssetManager = ({ user, onLogout }) => {
     const escape = (v) => { const s = String(v||'').replace(/"/g, '""'); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s; };
     
     // Assets sheet
-    const headers = ['Name','Category','Location','Serial Number','Part Number','Description','Purchase Date','Purchase Cost','Current Value','Quantity','Total Value','Depreciation Rate %'];
+    const headers = ['Name','Category','Location','Serial Number','Part Number','Description','Purchase Date','Purchase Cost','Current Value','Quantity','Total Value'];
     const rows = assets.map(a => [
       a.name, a.category, getLocationName(a.locationId), a.serialNumber, a.partNumber, a.description,
-      a.purchaseDate, a.purchaseCost, a.currentValue, a.quantity, (a.currentValue*a.quantity).toFixed(2), a.depreciationRate
+      a.purchaseDate, a.purchaseCost, a.currentValue, a.quantity, (a.currentValue*a.quantity).toFixed(2)
     ]);
     
     // Summary section
@@ -1279,9 +1279,8 @@ const AssetManager = ({ user, onLogout }) => {
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Cost</label><input className="input-field" type="number" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost:e.target.value})} /></div>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Current Value</label><input className="input-field" type="number" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue:e.target.value})} /></div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12, marginBottom:20 }}>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Quantity</label><input className="input-field" type="number" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity:e.target.value})} /></div>
-              <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Depreciation %</label><input className="input-field" type="number" value={newAsset.depreciationRate} onChange={e => setNewAsset({...newAsset, depreciationRate:e.target.value})} /></div>
             </div>
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
@@ -1311,9 +1310,8 @@ const AssetManager = ({ user, onLogout }) => {
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Cost</label><input className="input-field" type="number" value={editingAsset.purchaseCost} onChange={e => setEditingAsset({...editingAsset, purchaseCost:e.target.value})} /></div>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Current Value</label><input className="input-field" type="number" value={editingAsset.currentValue} onChange={e => setEditingAsset({...editingAsset, currentValue:e.target.value})} /></div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12, marginBottom:12 }}>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Quantity</label><input className="input-field" type="number" min="1" value={editingAsset.quantity} onChange={e => setEditingAsset({...editingAsset, quantity:e.target.value})} /></div>
-              <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Depreciation %</label><input className="input-field" type="number" value={editingAsset.depreciationRate} onChange={e => setEditingAsset({...editingAsset, depreciationRate:e.target.value})} /></div>
             </div>
             {/* Photos */}
             <div style={{ marginBottom:16 }}>
