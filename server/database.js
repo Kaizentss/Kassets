@@ -687,11 +687,22 @@ module.exports = {
     const oldAssets = legacyData.assets || [];
     oldAssets.forEach((a, i) => {
       const newId = i + 1;
-      assetMap[a.id] = newId;
+      const oldId = a.id || `__idx_${i}`;
+      assetMap[oldId] = newId;
+      // Also store by index so embedded photos can be matched
+      assetMap[`__idx_${i}`] = newId;
 
       // Map the location ID (handle both snake_case and camelCase from old app)
+      // Also handle export format where location is a name string instead of an ID
+      let mappedLocId = null;
       const oldLocId = a.location_id || a.locationId;
-      const mappedLocId = oldLocId ? (locationMap[oldLocId] || null) : null;
+      if (oldLocId) {
+        mappedLocId = locationMap[oldLocId] || null;
+      } else if (a.location && typeof a.location === 'string') {
+        // Export format: location is a name, find matching new location
+        const matchedLoc = newLocations.find(l => l.name === a.location);
+        if (matchedLoc) mappedLocId = matchedLoc.id;
+      }
 
       newAssets.push({
         id: newId,
@@ -729,9 +740,9 @@ module.exports = {
     });
 
     // Also handle photos embedded directly on assets (old frontend stored them as asset.photos[])
-    oldAssets.forEach(a => {
+    oldAssets.forEach((a, idx) => {
       if (a.photos && Array.isArray(a.photos)) {
-        const mappedAssetId = assetMap[a.id];
+        const mappedAssetId = assetMap[a.id] || assetMap[`__idx_${idx}`];
         if (mappedAssetId) {
           a.photos.forEach(p => {
             // Avoid duplicates (if already imported from top-level photos array)
@@ -768,9 +779,9 @@ module.exports = {
     });
 
     // Also handle notes embedded directly on assets
-    oldAssets.forEach(a => {
+    oldAssets.forEach((a, idx) => {
       if (a.notes && Array.isArray(a.notes)) {
-        const mappedAssetId = assetMap[a.id];
+        const mappedAssetId = assetMap[a.id] || assetMap[`__idx_${idx}`];
         if (mappedAssetId) {
           a.notes.forEach(n => {
             const alreadyExists = newNotes.find(nn => nn.asset_id === mappedAssetId && nn.text === n.text);
