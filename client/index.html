@@ -1279,8 +1279,36 @@ const AssetManager = ({ user, onLogout }) => {
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Cost</label><input className="input-field" type="number" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost:e.target.value})} /></div>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Current Value</label><input className="input-field" type="number" value={newAsset.currentValue} onChange={e => setNewAsset({...newAsset, currentValue:e.target.value})} /></div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12, marginBottom:20 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12, marginBottom:12 }}>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Quantity</label><input className="input-field" type="number" min="1" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity:e.target.value})} /></div>
+            </div>
+            {/* Photos */}
+            <div style={{ marginBottom:20 }}>
+              <label style={{ display:'block', marginBottom:8, fontSize:13, color:'#94a3b8' }}>📷 Photos ({newAsset.photos?.length||0}/5)</label>
+              {newAsset.photos?.length > 0 && (
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+                  {newAsset.photos.map((p, i) => (
+                    <div key={i} style={{ position:'relative' }}>
+                      <img src={p.url} style={{ width:60, height:60, objectFit:'cover', borderRadius:8 }} />
+                      <button onClick={() => setNewAsset({...newAsset, photos: newAsset.photos.filter((_,j) => j !== i)})} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, borderRadius:'50%', background:'#ef4444', color:'white', border:'none', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(newAsset.photos?.length||0) < 5 && (
+                <input type="file" accept="image/*" multiple onChange={e => {
+                  const files = Array.from(e.target.files);
+                  const max = 5 - (newAsset.photos?.length||0);
+                  const toAdd = files.slice(0, max);
+                  if(files.length > max) alert(`Only adding ${max} photo(s). Max 5.`);
+                  toAdd.forEach(f => {
+                    const r = new FileReader();
+                    r.onload = () => setNewAsset(prev => ({...prev, photos: [...(prev.photos||[]), {url:r.result, name:f.name}]}));
+                    r.readAsDataURL(f);
+                  });
+                  e.target.value='';
+                }} style={{ fontSize:12 }} />
+              )}
             </div>
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowAddAsset(false)}>Cancel</button>
