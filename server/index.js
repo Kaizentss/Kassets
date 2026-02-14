@@ -11,7 +11,8 @@ const db = require('./database');
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // API Routes
 app.use('/api', require('./routes')(db));
@@ -25,15 +26,18 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                                                            ║
-║   🪙  KASSETS - Asset Management System                    ║
+║   🪙  KASSETS 2.0 - Multi-Company Asset Management         ║
 ║                                                            ║
-║   🌐 Open: http://localhost:${PORT}                          ║
+║   🌐 Local:     http://localhost:${PORT}                      ║
+║   🌐 Network:   http://0.0.0.0:${PORT}                        ║
 ║                                                            ║
-║   👤 Login: admin / admin123                               ║
+║   📡 Tailscale: Use your Tailscale IP:${PORT}                 ║
+║                                                            ║
+║   🔑 Super Admin: superadmin / super123                    ║
 ║                                                            ║
 ║   ⚠️  Change password after first login!                   ║
 ║                                                            ║
