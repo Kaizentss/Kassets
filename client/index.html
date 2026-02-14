@@ -721,6 +721,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [showUserMgmt, setShowUserMgmt] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null); // null or { current, total, status }
   const [showBulkTransfer, setShowBulkTransfer] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [showBulkCategory, setShowBulkCategory] = useState(false);
@@ -834,7 +835,11 @@ const AssetManager = ({ user, onLogout }) => {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportJSON = () => {
+  const handleExportJSON = (compressed = false) => {
+    if (compressed) {
+      handleExportCompressed();
+      return;
+    }
     const exportData = {
       exportDate: new Date().toISOString(),
       company: companyName || 'Kassets',
@@ -852,6 +857,70 @@ const AssetManager = ({ user, onLogout }) => {
     };
     const slug = (companyName || 'kassets').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     downloadFile(JSON.stringify(exportData, null, 2), `${slug}-export-${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+  };
+
+  const compressImage = (base64url, maxWidth=800, quality=0.6) => {
+    return new Promise((resolve) => {
+      if (!base64url || !base64url.startsWith('data:image')) { resolve(base64url); return; }
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(base64url);
+      img.src = base64url;
+    });
+  };
+
+  const handleExportCompressed = async () => {
+    const totalPhotos = assets.reduce((s, a) => s + (a.photos||[]).filter(p => p.url && p.url.startsWith('data:image')).length, 0);
+    setExportProgress({ current: 0, total: totalPhotos, status: 'Compressing photos...' });
+
+    const compressedAssets = [];
+    let photosDone = 0;
+
+    for (const a of assets) {
+      const compPhotos = [];
+      for (const p of (a.photos||[])) {
+        if (p.url && p.url.startsWith('data:image')) {
+          const compressed = await compressImage(p.url, 800, 0.6);
+          compPhotos.push({ name: p.name, url: compressed });
+          photosDone++;
+          setExportProgress({ current: photosDone, total: totalPhotos, status: `Compressing photo ${photosDone}/${totalPhotos}...` });
+        } else {
+          compPhotos.push({ name: p.name, url: p.url });
+        }
+      }
+      compressedAssets.push({
+        name: a.name, category: a.category, serialNumber: a.serialNumber, partNumber: a.partNumber,
+        description: a.description, purchaseDate: a.purchaseDate, purchaseCost: a.purchaseCost,
+        currentValue: a.currentValue, quantity: a.quantity, depreciationRate: a.depreciationRate,
+        location: getLocationName(a.locationId),
+        notes: (a.notes||[]).map(n => ({ text: n.text, createdBy: n.created_by, date: n.created_at })),
+        photos: compPhotos
+      });
+    }
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      company: companyName || 'Kassets',
+      compressed: true,
+      assets: compressedAssets,
+      locations: locations.map(l => ({ name: l.name, address: l.address })),
+      categories: categories,
+      settings: { companyName, brandColor, bgColor1, bgColor2 }
+    };
+
+    const slug = (companyName || 'kassets').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    setExportProgress({ current: totalPhotos, total: totalPhotos, status: `Done! File size: ${(new Blob([jsonStr]).size / (1024*1024)).toFixed(1)} MB` });
+    downloadFile(jsonStr, `${slug}-compressed-${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+    setTimeout(() => setExportProgress(null), 5000);
   };
 
   const handleExportExcel = () => {
@@ -1396,37 +1465,56 @@ const AssetManager = ({ user, onLogout }) => {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:450 }}>
+        <div className="modal-overlay" onClick={() => !exportProgress && setShowExportModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
             <h2 style={{ marginBottom:8 }}>📤 Export Company Data</h2>
             <p style={{ color:'var(--text-muted)', fontSize:13, marginBottom:24 }}>Download all assets, locations, categories, and notes for <strong style={{ color:'var(--text-primary)' }}>{companyName || 'this company'}</strong></p>
             
             <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
-              <button className="btn-primary" style={{ padding:'16px 24px', display:'flex', alignItems:'center', gap:12, justifyContent:'center' }} onClick={() => { handleExportJSON(); setShowExportModal(false); }}>
-                <span style={{ fontSize:22 }}>📋</span>
+              <button className="btn-primary" style={{ padding:'16px 24px', display:'flex', alignItems:'center', gap:12, justifyContent:'center' }} disabled={!!exportProgress} onClick={() => { handleExportJSON(true); }}>
+                <span style={{ fontSize:22 }}>🗜️</span>
                 <div style={{ textAlign:'left' }}>
-                  <div style={{ fontWeight:600 }}>Export as JSON</div>
-                  <div style={{ fontSize:11, opacity:0.8, fontWeight:400 }}>Full data backup • Re-importable • Photos included</div>
+                  <div style={{ fontWeight:600 }}>Export Compressed JSON</div>
+                  <div style={{ fontSize:11, opacity:0.8, fontWeight:400 }}>Photos resized & compressed • Small file • Re-importable</div>
                 </div>
               </button>
-              <button className="btn-gold" style={{ padding:'16px 24px', display:'flex', alignItems:'center', gap:12, justifyContent:'center' }} onClick={() => { handleExportExcel(); setShowExportModal(false); }}>
+              <button className="btn-secondary" style={{ padding:'14px 24px', display:'flex', alignItems:'center', gap:12, justifyContent:'center' }} disabled={!!exportProgress} onClick={() => { handleExportJSON(false); setShowExportModal(false); }}>
+                <span style={{ fontSize:22 }}>📋</span>
+                <div style={{ textAlign:'left' }}>
+                  <div style={{ fontWeight:600 }}>Export Full JSON</div>
+                  <div style={{ fontSize:11, opacity:0.8, fontWeight:400 }}>Original quality photos • Larger file • Full backup</div>
+                </div>
+              </button>
+              <button className="btn-secondary" style={{ padding:'14px 24px', display:'flex', alignItems:'center', gap:12, justifyContent:'center' }} disabled={!!exportProgress} onClick={() => { handleExportExcel(); setShowExportModal(false); }}>
                 <span style={{ fontSize:22 }}>📊</span>
                 <div style={{ textAlign:'left' }}>
                   <div style={{ fontWeight:600 }}>Export as CSV / Excel</div>
-                  <div style={{ fontSize:11, opacity:0.8, fontWeight:400 }}>Spreadsheet format • Summary + details • Opens in Excel</div>
+                  <div style={{ fontSize:11, opacity:0.8, fontWeight:400 }}>Spreadsheet format • No photos • Opens in Excel</div>
                 </div>
               </button>
             </div>
+
+            {exportProgress && (
+              <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:12, padding:16, marginBottom:20, border:'1px solid var(--border-color)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--text-muted)', marginBottom:8 }}>
+                  <span>{exportProgress.status}</span>
+                  <span>{exportProgress.total > 0 ? Math.round((exportProgress.current/exportProgress.total)*100) : 0}%</span>
+                </div>
+                <div style={{ width:'100%', height:8, background:'rgba(148,163,184,0.1)', borderRadius:4, overflow:'hidden' }}>
+                  <div style={{ height:'100%', borderRadius:4, background:'linear-gradient(90deg, #ffd700, #34d399)', transition:'width 0.3s', width: exportProgress.total > 0 ? (exportProgress.current/exportProgress.total*100)+'%' : '0%' }} />
+                </div>
+              </div>
+            )}
 
             <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:10, padding:14, border:'1px solid var(--border-color)', marginBottom:20 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, textAlign:'center' }}>
                 <div><p style={{ fontSize:20, fontWeight:700, margin:0, fontFamily:"'JetBrains Mono', monospace" }}>{assets.length}</p><p style={{ fontSize:11, color:'var(--text-muted)', margin:0 }}>Assets</p></div>
                 <div><p style={{ fontSize:20, fontWeight:700, margin:0, fontFamily:"'JetBrains Mono', monospace" }}>{locations.length}</p><p style={{ fontSize:11, color:'var(--text-muted)', margin:0 }}>Locations</p></div>
-                <div><p style={{ fontSize:20, fontWeight:700, margin:0, fontFamily:"'JetBrains Mono', monospace" }}>{categories.length}</p><p style={{ fontSize:11, color:'var(--text-muted)', margin:0 }}>Categories</p></div>
+                <div><p style={{ fontSize:20, fontWeight:700, margin:0, fontFamily:"'JetBrains Mono', monospace" }}>{assets.reduce((s,a) => s + (a.photos||[]).length, 0)}</p><p style={{ fontSize:11, color:'var(--text-muted)', margin:0 }}>Photos</p></div>
               </div>
             </div>
 
-            <div style={{ textAlign:'right' }}><button className="btn-secondary" onClick={() => setShowExportModal(false)}>Close</button></div>
+            <div style={{ textAlign:'right' }}><button className="btn-secondary" onClick={() => { setExportProgress(null); setShowExportModal(false); }}>{exportProgress ? 'Done' : 'Close'}</button></div>
           </div>
         </div>
       )}
