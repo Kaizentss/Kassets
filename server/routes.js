@@ -316,6 +316,6 @@ module.exports = (db) => {
       res.status(500).json({ error: e.message });
     }
   });
-
+ router.get('/export-db',(q,r)=>{r.download(require('path').join(__dirname,'..','database','data.json'));});
   return router;
 };
