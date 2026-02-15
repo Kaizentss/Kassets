@@ -411,6 +411,19 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, cursor: 'pointer', color: '#94a3b8' }}>
               <input type="checkbox" checked={showEditCompany.is_active} onChange={e => setShowEditCompany({...showEditCompany, is_active: e.target.checked?1:0})} /> Company Active
             </label>
+            <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:12, padding:16, marginBottom:20, border:'1px solid var(--border-color)' }}>
+              <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>📷 Photo Upload Settings</label>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div>
+                  <div style={{ fontSize:13, color:'var(--text-primary)' }}>Compress photos on upload</div>
+                  <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2 }}>Resizes to 800px & JPEG 60% — saves ~80% storage</div>
+                </div>
+                <div onClick={() => setShowEditCompany({...showEditCompany, compress_photos: !showEditCompany.compress_photos})} style={{ width:48, height:26, borderRadius:13, background:showEditCompany.compress_photos!==false?'#22c55e':'rgba(148,163,184,0.3)', cursor:'pointer', transition:'all 0.3s', position:'relative', flexShrink:0 }}>
+                  <div style={{ width:22, height:22, borderRadius:11, background:'white', position:'absolute', top:2, left:showEditCompany.compress_photos!==false?24:2, transition:'all 0.3s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+                </div>
+              </div>
+              {showEditCompany.compress_photos===false && <div style={{ marginTop:10, padding:'8px 12px', borderRadius:8, background:'rgba(234,179,8,0.15)', fontSize:11, color:'#eab308' }}>⚠️ Full resolution photos will use significantly more storage and memory</div>}
+            </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowEditCompany(null)}>Cancel</button>
               <button className="btn-primary" onClick={handleUpdateCompany}>Save</button>
@@ -813,7 +826,7 @@ const AssetManager = ({ user, onLogout }) => {
   const handleRenameCategory = async () => { if(!editingCategoryName.trim()||editingCategoryName===editingCategory){setEditingCategory(null);return;} try { await api('/categories/rename',{method:'POST',body:JSON.stringify({oldName:editingCategory,newName:editingCategoryName.trim()})}); setEditingCategory(null); setEditingCategoryName(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleDeleteCategory = async (n) => { const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
 
-  const handleSaveSettings = async () => { try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2, compressPhotos})}); setShowSettings(false); } catch(e){ alert(e.message); } };
+  const handleSaveSettings = async () => { try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2})}); setShowSettings(false); } catch(e){ alert(e.message); } };
   const handleChangePw = async () => { if(!pwData.current||!pwData.new||!pwData.confirm) return alert('Fill all fields'); if(pwData.new!==pwData.confirm) return alert('Mismatch'); try { await api('/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword:pwData.current,newPassword:pwData.new})}); alert('Changed!'); setShowChangePw(false); setPwData({current:'',new:'',confirm:''}); } catch(e){ alert(e.message); } };
 
   // ===== EXPORT FUNCTIONS =====
@@ -1440,21 +1453,6 @@ const AssetManager = ({ user, onLogout }) => {
               </div>
             </>}
             
-            {user.role === 'master_admin' && (
-              <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:12, padding:16, marginBottom:20, border:'1px solid var(--border-color)' }}>
-                <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>📷 Photo Upload Settings</label>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <div>
-                    <div style={{ fontSize:13, color:'var(--text-primary)' }}>Compress photos on upload</div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2 }}>Resizes to 800px & JPEG 60% — saves ~80% storage</div>
-                  </div>
-                  <div onClick={() => setCompressPhotos(!compressPhotos)} style={{ width:48, height:26, borderRadius:13, background:compressPhotos?'#22c55e':'rgba(148,163,184,0.3)', cursor:'pointer', transition:'all 0.3s', position:'relative', flexShrink:0 }}>
-                    <div style={{ width:22, height:22, borderRadius:11, background:'white', position:'absolute', top:2, left:compressPhotos?24:2, transition:'all 0.3s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
-                  </div>
-                </div>
-                {!compressPhotos && <div style={{ marginTop:10, padding:'8px 12px', borderRadius:8, background:'rgba(234,179,8,0.15)', fontSize:11, color:'#eab308' }}>⚠️ Full resolution photos will use significantly more storage and memory</div>}
-              </div>
-            )}
             
             <button className="btn-secondary" style={{ width:'100%', marginBottom:20 }} onClick={() => { setShowSettings(false); setShowChangePw(true); }}>🔑 Change Password</button>
             
