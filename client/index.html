@@ -1797,13 +1797,13 @@ const App = () => {
     const token = localStorage.getItem('kassets_token');
     const savedUser = localStorage.getItem('kassets_user');
     if (token && savedUser) {
-      api('/auth/me').then(u => setUser(u)).catch(() => { localStorage.clear(); }).finally(() => setLoading(false));
+      api('/auth/me').then(u => setUser(u)).catch(() => { localStorage.removeItem('kassets_token'); localStorage.removeItem('kassets_user'); }).finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
   }, []);
 
-  const handleLogout = () => { localStorage.clear(); setUser(null); };
+  const handleLogout = () => { localStorage.removeItem('kassets_token'); localStorage.removeItem('kassets_user'); setUser(null); };
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   if (loading) return <div style={{ minHeight:'100vh', background:'var(--bg-secondary)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)' }}>Loading...</div>;
