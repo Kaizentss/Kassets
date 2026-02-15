@@ -1610,10 +1610,10 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => { setShowNotesModal(null); setNewNote(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom:16 }}>📝 Notes: {showNotesModal.name}</h2>
-            {canEditData && <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
               <textarea className="input-field" placeholder="Add a note..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={2} style={{ resize:'vertical' }} />
               <button className="btn-primary" style={{ alignSelf:'flex-end' }} onClick={handleAddNote}>Add</button>
-            </div>}
+            </div>
             <div style={{ maxHeight:300, overflowY:'auto' }}>
               {(showNotesModal.notes||[]).map(n => (
                 <div key={n.id} style={{ padding:'12px', marginBottom:8, background:'rgba(15,23,42,0.5)', borderRadius:8, borderLeft:'3px solid #3b82f6' }}>
