@@ -359,10 +359,14 @@ module.exports = (db) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
-      const updates = { company_name: req.body.companyName || '' };
-      if (req.body.brandColor) updates.brand_color = req.body.brandColor;
-      if (req.body.bgColor1) updates.bg_color_1 = req.body.bgColor1;
-      if (req.body.bgColor2) updates.bg_color_2 = req.body.bgColor2;
+      const updates = {};
+      // Only master_admin can change company name and default colors
+      if (req.user.role === 'master_admin') {
+        updates.company_name = req.body.companyName || '';
+        if (req.body.brandColor) updates.brand_color = req.body.brandColor;
+        if (req.body.bgColor1) updates.bg_color_1 = req.body.bgColor1;
+        if (req.body.bgColor2) updates.bg_color_2 = req.body.bgColor2;
+      }
       if (req.body.compressPhotos !== undefined) updates.compress_photos = req.body.compressPhotos;
       db.updateSettings(companyId, updates);
       res.json({ message: 'Saved' });
@@ -573,7 +577,7 @@ module.exports = (db) => {
   });
 
   // ========== NOTES ==========
-  router.post('/assets/:id/notes', auth, canEdit, (req, res) => {
+  router.post('/assets/:id/notes', auth, (req, res) => {
     try {
       const note = db.addNote(parseInt(req.params.id), req.body.text, req.user.displayName || req.user.username);
       res.json(note);
