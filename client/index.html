@@ -839,8 +839,8 @@ const AssetManager = ({ user, onLogout }) => {
   const handleSaveSettings = async () => {
     // Save user's personal color prefs to localStorage only
     localStorage.setItem(userColorKey, JSON.stringify({ brandColor, bgColor1, bgColor2 }));
-    // Save company name if admin (but NOT colors - those are personal)
-    if (isAdminRole) {
+    // Save company name if master_admin
+    if (user.role === 'master_admin') {
       try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName})}); } catch(e){ alert(e.message); return; }
     }
     setShowSettings(false);
@@ -1438,7 +1438,7 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:450 }}>
             <h2 style={{ marginBottom:20 }}>⚙️ Settings</h2>
-            {isAdminRole && <>
+            {user.role === 'master_admin' && <>
               <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>Company Display Name</label>
               <input className="input-field" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom:20 }} />
             </>}
