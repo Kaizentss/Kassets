@@ -741,9 +741,12 @@ const AssetManager = ({ user, onLogout }) => {
   const [newLocation, setNewLocation] = useState({ name:'', address:'' });
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwData, setPwData] = useState({ current:'', new:'', confirm:'' });
-  const [brandColor, setBrandColor] = useState('#ffd700');
-  const [bgColor1, setBgColor1] = useState('#0f172a');
-  const [bgColor2, setBgColor2] = useState('#1e293b');
+  const userColorKey = `kassets_colors_${user.username}`;
+  const savedUserColors = JSON.parse(localStorage.getItem(userColorKey) || 'null');
+  const [brandColor, setBrandColor] = useState(savedUserColors?.brandColor || '#ffd700');
+  const [bgColor1, setBgColor1] = useState(savedUserColors?.bgColor1 || '#0f172a');
+  const [bgColor2, setBgColor2] = useState(savedUserColors?.bgColor2 || '#1e293b');
+  const [companyDefaultColors, setCompanyDefaultColors] = useState({ brandColor:'#ffd700', bgColor1:'#0f172a', bgColor2:'#1e293b' });
   const [compressPhotos, setCompressPhotos] = useState(true);
 
   const canEditData = ['master_admin','admin','editor'].includes(user.role);
@@ -758,9 +761,16 @@ const AssetManager = ({ user, onLogout }) => {
       setLocations(l.map(x => ({ id:x.id, name:x.name, address:x.address })).sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' })));
       setCategories(c.map(x => x.name).sort((a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' })));
       setCompanyName(s.company_name || '');
-      if (s.brand_color) setBrandColor(s.brand_color);
-      if (s.bg_color_1) setBgColor1(s.bg_color_1);
-      if (s.bg_color_2) setBgColor2(s.bg_color_2);
+      // Store company default colors
+      const defaults = { brandColor: s.brand_color || '#ffd700', bgColor1: s.bg_color_1 || '#0f172a', bgColor2: s.bg_color_2 || '#1e293b' };
+      setCompanyDefaultColors(defaults);
+      // Only apply company colors if user hasn't saved their own
+      const uc = JSON.parse(localStorage.getItem(userColorKey) || 'null');
+      if (!uc) {
+        if (s.brand_color) setBrandColor(s.brand_color);
+        if (s.bg_color_1) setBgColor1(s.bg_color_1);
+        if (s.bg_color_2) setBgColor2(s.bg_color_2);
+      }
       if (s.compress_photos !== undefined) setCompressPhotos(s.compress_photos !== false);
     } catch (e) { console.error('Load error:', e); }
   };
@@ -826,7 +836,21 @@ const AssetManager = ({ user, onLogout }) => {
   const handleRenameCategory = async () => { if(!editingCategoryName.trim()||editingCategoryName===editingCategory){setEditingCategory(null);return;} try { await api('/categories/rename',{method:'POST',body:JSON.stringify({oldName:editingCategory,newName:editingCategoryName.trim()})}); setEditingCategory(null); setEditingCategoryName(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleDeleteCategory = async (n) => { const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
 
-  const handleSaveSettings = async () => { try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2})}); setShowSettings(false); } catch(e){ alert(e.message); } };
+  const handleSaveSettings = async () => {
+    // Save user's personal color prefs to localStorage
+    localStorage.setItem(userColorKey, JSON.stringify({ brandColor, bgColor1, bgColor2 }));
+    // Save company-wide settings (name + company default colors) to server if admin
+    if (isAdminRole) {
+      try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2})}); } catch(e){ alert(e.message); return; }
+    }
+    setShowSettings(false);
+  };
+  const handleResetToCompanyColors = () => {
+    setBrandColor(companyDefaultColors.brandColor);
+    setBgColor1(companyDefaultColors.bgColor1);
+    setBgColor2(companyDefaultColors.bgColor2);
+    localStorage.removeItem(userColorKey);
+  };
   const handleChangePw = async () => { if(!pwData.current||!pwData.new||!pwData.confirm) return alert('Fill all fields'); if(pwData.new!==pwData.confirm) return alert('Mismatch'); try { await api('/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword:pwData.current,newPassword:pwData.new})}); alert('Changed!'); setShowChangePw(false); setPwData({current:'',new:'',confirm:''}); } catch(e){ alert(e.message); } };
 
   // ===== EXPORT FUNCTIONS =====
@@ -1407,11 +1431,12 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:450 }}>
             <h2 style={{ marginBottom:20 }}>⚙️ Settings</h2>
-            <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>Company Display Name</label>
-            <input className="input-field" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom:20 }} />
-            
             {isAdminRole && <>
-              <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>🎨 Company Branding</label>
+              <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>Company Display Name</label>
+              <input className="input-field" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom:20 }} />
+            </>}
+            
+            <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>🎨 My Colors {isAdminRole && <span style={{ fontSize:11, color:'var(--text-muted)' }}>(also sets company defaults)</span>}</label>
               <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:12, padding:16, marginBottom:20, border:'1px solid var(--border-color)' }}>
                 <div style={{ marginBottom:16 }}>
                   <label style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6, fontSize:13, color:'var(--text-secondary)' }}>
@@ -1449,9 +1474,8 @@ const AssetManager = ({ user, onLogout }) => {
                   <h3 style={{ margin:0, color: brandColor, fontSize:18, fontWeight:700 }}>{companyName || 'Company Name'}</h3>
                   <p style={{ margin:'2px 0 0', fontSize:11, color:'var(--text-muted)' }}>Asset Management</p>
                 </div>
-                <button className="btn-secondary" style={{ marginTop:12, width:'100%', fontSize:12 }} onClick={() => { setBrandColor('#ffd700'); setBgColor1('#0f172a'); setBgColor2('#1e293b'); }}>↩ Reset to Defaults</button>
+                <button className="btn-secondary" style={{ marginTop:12, width:'100%', fontSize:12 }} onClick={handleResetToCompanyColors}>↩ Reset to Company Colors</button>
               </div>
-            </>}
             
             
             <button className="btn-secondary" style={{ width:'100%', marginBottom:20 }} onClick={() => { setShowSettings(false); setShowChangePw(true); }}>🔑 Change Password</button>
