@@ -810,7 +810,7 @@ const AssetManager = ({ user, onLogout }) => {
   };
 
   const handleDeleteAsset = async (id) => { if (!confirm('Delete this asset?')) return; try { await api('/assets/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
-  const handleDuplicate = async (a) => { try { await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleDuplicate = async (a) => { try { const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} loadAllData(); } catch(e){ alert(e.message); } };
   
   const handleDeletePhoto = async (aid,pid) => { if(!confirm('Delete photo?')) return; try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); loadAllData(); if(editingAsset){const u=(await api('/assets')).find(a=>a.id===aid);if(u)setEditingAsset({...editingAsset,photos:u.photos||[]});} } catch(e){ alert(e.message); } };
   
