@@ -837,13 +837,20 @@ const AssetManager = ({ user, onLogout }) => {
   const handleDeleteCategory = async (n) => { const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
 
   const handleSaveSettings = async () => {
-    // Save user's personal color prefs to localStorage
+    // Save user's personal color prefs to localStorage only
     localStorage.setItem(userColorKey, JSON.stringify({ brandColor, bgColor1, bgColor2 }));
-    // Save company-wide settings (name + company default colors) to server if admin
+    // Save company name if admin (but NOT colors - those are personal)
     if (isAdminRole) {
-      try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2})}); } catch(e){ alert(e.message); return; }
+      try { await api('/settings',{method:'PUT',body:JSON.stringify({companyName})}); } catch(e){ alert(e.message); return; }
     }
     setShowSettings(false);
+  };
+  const handleSetCompanyColors = async () => {
+    try {
+      await api('/settings',{method:'PUT',body:JSON.stringify({companyName, brandColor, bgColor1, bgColor2})});
+      setCompanyDefaultColors({ brandColor, bgColor1, bgColor2 });
+      alert('Company default colors updated! New users will see these colors.');
+    } catch(e){ alert(e.message); }
   };
   const handleResetToCompanyColors = () => {
     setBrandColor(companyDefaultColors.brandColor);
@@ -1436,7 +1443,7 @@ const AssetManager = ({ user, onLogout }) => {
               <input className="input-field" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom:20 }} />
             </>}
             
-            <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>🎨 My Colors {isAdminRole && <span style={{ fontSize:11, color:'var(--text-muted)' }}>(also sets company defaults)</span>}</label>
+            <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>🎨 My Colors {user.role === 'master_admin' && <span style={{ fontSize:11, color:'var(--text-muted)' }}>(can set as company defaults)</span>}</label>
               <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:12, padding:16, marginBottom:20, border:'1px solid var(--border-color)' }}>
                 <div style={{ marginBottom:16 }}>
                   <label style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6, fontSize:13, color:'var(--text-secondary)' }}>
@@ -1474,7 +1481,10 @@ const AssetManager = ({ user, onLogout }) => {
                   <h3 style={{ margin:0, color: brandColor, fontSize:18, fontWeight:700 }}>{companyName || 'Company Name'}</h3>
                   <p style={{ margin:'2px 0 0', fontSize:11, color:'var(--text-muted)' }}>Asset Management</p>
                 </div>
-                <button className="btn-secondary" style={{ marginTop:12, width:'100%', fontSize:12 }} onClick={handleResetToCompanyColors}>↩ Reset to Company Colors</button>
+                <div style={{ display:'flex', gap:8, marginTop:12 }}>
+                  <button className="btn-secondary" style={{ flex:1, fontSize:12 }} onClick={handleResetToCompanyColors}>↩ Reset to Company Colors</button>
+                  {user.role === 'master_admin' && <button className="btn-primary" style={{ flex:1, fontSize:12 }} onClick={handleSetCompanyColors}>🏢 Set as Company Default</button>}
+                </div>
               </div>
             
             
