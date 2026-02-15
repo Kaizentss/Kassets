@@ -113,8 +113,8 @@ module.exports = (db) => {
 
   router.put('/companies/:id', auth, isSuperAdmin, (req, res) => {
     try {
-      const { name, address, phone, email, is_active } = req.body;
-      db.updateCompany(parseInt(req.params.id), { name, address, phone, email, is_active });
+      const { name, address, phone, email, is_active, compress_photos } = req.body;
+      db.updateCompany(parseInt(req.params.id), { name, address, phone, email, is_active, compress_photos });
       res.json({ message: 'Updated' });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -348,7 +348,11 @@ module.exports = (db) => {
   router.get('/settings', auth, (req, res) => {
     const companyId = getCompanyId(req);
     if (!companyId) return res.json({ company_name: 'KASSETS Platform' });
-    res.json(db.getSettings(companyId));
+    const settings = db.getSettings(companyId);
+    // Include company-level compress_photos setting (managed by super_admin)
+    const company = db.getCompanies().find(c => c.id === companyId);
+    if (company && company.compress_photos !== undefined) settings.compress_photos = company.compress_photos;
+    res.json(settings);
   });
 
   router.put('/settings', auth, canEdit, (req, res) => {
@@ -359,6 +363,7 @@ module.exports = (db) => {
       if (req.body.brandColor) updates.brand_color = req.body.brandColor;
       if (req.body.bgColor1) updates.bg_color_1 = req.body.bgColor1;
       if (req.body.bgColor2) updates.bg_color_2 = req.body.bgColor2;
+      if (req.body.compressPhotos !== undefined) updates.compress_photos = req.body.compressPhotos;
       db.updateSettings(companyId, updates);
       res.json({ message: 'Saved' });
     } catch (e) {
