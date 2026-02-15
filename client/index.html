@@ -711,7 +711,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [locations, setLocations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [companyName, setCompanyName] = useState('');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(['master_admin','admin'].includes(user.role) ? 'dashboard' : 'assets');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1081,7 +1081,7 @@ const AssetManager = ({ user, onLogout }) => {
 
       {/* Tabs */}
       <nav style={{ padding:'0 24px', borderBottom:'1px solid rgba(148,163,184,0.1)', display:'flex', gap:4, overflowX:'auto' }}>
-        {(isAdminRole ? ['dashboard','assets','locations','balance-sheet'] : ['dashboard','assets','locations']).map(t => (
+        {(isAdminRole ? (user.role === 'master_admin' || user.role === 'admin' ? ['dashboard','assets','locations','balance-sheet'] : ['dashboard','assets','locations']) : ['assets']).map(t => (
           <button key={t} className={`tab-btn ${activeTab===t?'active':''}`} onClick={() => setActiveTab(t)}>
             {t.charAt(0).toUpperCase()+t.slice(1).replace('-',' ')}
           </button>
@@ -1148,7 +1148,7 @@ const AssetManager = ({ user, onLogout }) => {
                 <span style={{ fontWeight:600 }}>{selectedAssets.length} selected</span>
                 <button className="btn-primary" style={{ padding:'8px 16px' }} onClick={() => setShowBulkTransfer(true)}>📍 Move</button>
                 <button className="btn-purple" style={{ padding:'8px 16px' }} onClick={() => setShowBulkCategory(true)}>🏷️ Category</button>
-                <button className="btn-danger" style={{ padding:'8px 16px' }} onClick={() => setShowBulkDelete(true)}>🗑️ Delete</button>
+                {isAdminRole && <button className="btn-danger" style={{ padding:'8px 16px' }} onClick={() => setShowBulkDelete(true)}>🗑️ Delete</button>}
                 <button className="btn-secondary" style={{ padding:'8px 16px' }} onClick={() => setSelectedAssets([])}>Clear</button>
               </div>
             )}
@@ -1173,7 +1173,7 @@ const AssetManager = ({ user, onLogout }) => {
                       <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11, background:asset.notes?.length?'rgba(251,191,36,0.2)':undefined }} onClick={() => setShowNotesModal(asset)}>📝 {asset.notes?.length||''}</button>
                       {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDuplicate(asset)}>📋</button>}
                       {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => setEditingAsset({...asset})}>Edit</button>}
-                      {canEditData && <button className="btn-danger" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDeleteAsset(asset.id)}>Delete</button>}
+                      {isAdminRole && <button className="btn-danger" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDeleteAsset(asset.id)}>Delete</button>}
                     </div>
                   </div>
                 </div>
@@ -1193,7 +1193,7 @@ const AssetManager = ({ user, onLogout }) => {
                   <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:10, padding:12 }}><p style={{ color:'#64748b', fontSize:11, margin:0 }}>Assets</p><p style={{ fontSize:22, fontWeight:700, margin:'4px 0 0' }}>{la.length}</p></div>
                   {isAdminRole && <div style={{ background:'rgba(15,23,42,0.5)', borderRadius:10, padding:12 }}><p style={{ color:'#64748b', fontSize:11, margin:0 }}>Value</p><p style={{ fontSize:16, fontWeight:700, margin:'4px 0 0', color:'#34d399', fontFamily:"'JetBrains Mono', monospace" }}>{formatCurrency(lv)}</p></div>}
                 </div>
-                {canEditData && <div style={{ display:'flex', gap:8 }}><button className="btn-secondary" style={{ flex:1, padding:'10px 16px' }} onClick={() => setEditingLocation({...loc})}>Edit</button><button className="btn-danger" style={{ flex:1, padding:'10px 16px' }} onClick={() => handleDeleteLocation(loc.id)}>Delete</button></div>}
+                {isAdminRole && <div style={{ display:'flex', gap:8 }}><button className="btn-secondary" style={{ flex:1, padding:'10px 16px' }} onClick={() => setEditingLocation({...loc})}>Edit</button><button className="btn-danger" style={{ flex:1, padding:'10px 16px' }} onClick={() => handleDeleteLocation(loc.id)}>Delete</button></div>}
               </div>
             ); })}
           </div>
@@ -1396,7 +1396,7 @@ const AssetManager = ({ user, onLogout }) => {
               {editingAsset.photos?.length>0 && <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>{editingAsset.photos.map(p => (
                 <div key={p.id} style={{ position:'relative' }}>
                   <img src={p.url} style={{ width:60, height:60, objectFit:'cover', borderRadius:8 }} />
-                  <button onClick={() => handleDeletePhoto(editingAsset.id, p.id)} style={{ position:'absolute', top:-6, right:-6, background:'#ef4444', border:'none', borderRadius:'50%', width:20, height:20, color:'white', fontSize:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                  {isAdminRole && <button onClick={() => handleDeletePhoto(editingAsset.id, p.id)} style={{ position:'absolute', top:-6, right:-6, background:'#ef4444', border:'none', borderRadius:'50%', width:20, height:20, color:'white', fontSize:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>}
                 </div>
               ))}</div>}
               {(editingAsset.photos?.length||0)<5 && <input type="file" accept="image/*" multiple onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ fontSize:12 }} />}
@@ -1619,7 +1619,7 @@ const AssetManager = ({ user, onLogout }) => {
                 <div key={n.id} style={{ padding:'12px', marginBottom:8, background:'rgba(15,23,42,0.5)', borderRadius:8, borderLeft:'3px solid #3b82f6' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
                     <span style={{ fontSize:11, color:'#64748b' }}>{n.created_by} • {new Date(n.created_at).toLocaleString()}</span>
-                    {canEditData && <button onClick={() => handleDeleteNote(n.id)} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer' }}>✕</button>}
+                    {isAdminRole && <button onClick={() => handleDeleteNote(n.id)} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer' }}>✕</button>}
                   </div>
                   <p style={{ margin:0, whiteSpace:'pre-wrap' }}>{n.text}</p>
                 </div>
@@ -1642,7 +1642,7 @@ const AssetManager = ({ user, onLogout }) => {
                   <div style={{ padding:8, display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                     <span style={{ fontSize:11, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{p.name}</span>
                     <a href={p.url} download={p.name} style={{ color:'#60a5fa', fontSize:11, textDecoration:'none' }}>⬇</a>
-                    {canEditData && <button onClick={() => { handleDeletePhoto(showPhotoViewer.id,p.id); setShowPhotoViewer({...showPhotoViewer, photos:showPhotoViewer.photos.filter(x=>x.id!==p.id)}); }} style={{ background:'rgba(239,68,68,0.2)', border:'none', color:'#f87171', fontSize:11, padding:'2px 6px', borderRadius:4, cursor:'pointer' }}>🗑</button>}
+                    {isAdminRole && <button onClick={() => { handleDeletePhoto(showPhotoViewer.id,p.id); setShowPhotoViewer({...showPhotoViewer, photos:showPhotoViewer.photos.filter(x=>x.id!==p.id)}); }} style={{ background:'rgba(239,68,68,0.2)', border:'none', color:'#f87171', fontSize:11, padding:'2px 6px', borderRadius:4, cursor:'pointer' }}>🗑</button>}
                   </div>
                 </div>
               ))}
