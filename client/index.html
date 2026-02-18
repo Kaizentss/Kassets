@@ -320,6 +320,7 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ margin: 0 }}>🏢 Companies</h2>
               <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-secondary" onClick={async () => { try { const data = await api('/export-platform'); const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`kassets-platform-backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); } catch(e){ alert(e.message); } }}>💾 Export Platform</button>
                 <button className="btn-gold" onClick={() => { setShowImportLegacy(true); setImportResult(null); setImportData({ companyName: '', file: null, fileName: '', masterUsername: '', masterPassword: '', masterDisplayName: '' }); }}>📥 Import Legacy DB</button>
                 <button className="btn-purple" onClick={() => setShowAddCompany(true)}>+ New Company</button>
               </div>
@@ -735,6 +736,8 @@ const AssetManager = ({ user, onLogout }) => {
   const [editingLocation, setEditingLocation] = useState(null);
   const [showNotesModal, setShowNotesModal] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [auditLog, setAuditLog] = useState([]);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
   const [newNote, setNewNote] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -822,10 +825,10 @@ const AssetManager = ({ user, onLogout }) => {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDeleteAsset = async (id) => { if (!confirm('Delete this asset?')) return; try { await api('/assets/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleDeleteAsset = async (id) => { const a = assets.find(x=>x.id===id); if (!confirm(`⚠️ CAUTION: You are about to permanently delete:\n\n"${a?.name || 'this asset'}"\n\nThis action cannot be undone. All photos and notes for this asset will also be deleted.\n\nAre you sure?`)) return; try { await api('/assets/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
   const handleDuplicate = async (a) => { try { const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} loadAllData(); } catch(e){ alert(e.message); } };
   
-  const handleDeletePhoto = async (aid,pid) => { if(!confirm('Delete photo?')) return; try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); loadAllData(); if(editingAsset){const u=(await api('/assets')).find(a=>a.id===aid);if(u)setEditingAsset({...editingAsset,photos:u.photos||[]});} } catch(e){ alert(e.message); } };
+  const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); loadAllData(); if(editingAsset){const u=(await api('/assets')).find(a=>a.id===aid);if(u)setEditingAsset({...editingAsset,photos:u.photos||[]});} } catch(e){ alert(e.message); } };
   
   const handleBulkTransfer = async () => { if(!bulkTransferTo) return; try { await api('/assets/bulk-transfer',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,locationId:parseInt(bulkTransferTo)})}); setShowBulkTransfer(false); setSelectedAssets([]); setBulkTransferTo(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleBulkCategory = async () => { if(!bulkCategoryTo) return; try { await api('/assets/bulk-category',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,category:bulkCategoryTo})}); setShowBulkCategory(false); setSelectedAssets([]); setBulkCategoryTo(''); loadAllData(); } catch(e){ alert(e.message); } };
@@ -848,11 +851,11 @@ const AssetManager = ({ user, onLogout }) => {
 
   const handleAddLocation = async () => { if(!newLocation.name) return; try { await api('/locations',{method:'POST',body:JSON.stringify(newLocation)}); setShowAddLocation(false); setNewLocation({name:'',address:''}); loadAllData(); } catch(e){ alert(e.message); } };
   const handleUpdateLocation = async () => { try { await api('/locations/'+editingLocation.id,{method:'PUT',body:JSON.stringify(editingLocation)}); setEditingLocation(null); loadAllData(); } catch(e){ alert(e.message); } };
-  const handleDeleteLocation = async (id) => { try { await api('/locations/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleDeleteLocation = async (id) => { const loc = locations.find(l=>l.id===id); if(!confirm(`⚠️ CAUTION: Delete location "${loc?.name || ''}"?\n\nThis action cannot be undone.`)) return; try { await api('/locations/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
 
   const handleAddCategory = async () => { if(!newCategory.trim()||categories.includes(newCategory.trim())) return; try { await api('/categories',{method:'POST',body:JSON.stringify({name:newCategory.trim()})}); setNewCategory(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleRenameCategory = async () => { if(!editingCategoryName.trim()||editingCategoryName===editingCategory){setEditingCategory(null);return;} try { await api('/categories/rename',{method:'POST',body:JSON.stringify({oldName:editingCategory,newName:editingCategoryName.trim()})}); setEditingCategory(null); setEditingCategoryName(''); loadAllData(); } catch(e){ alert(e.message); } };
-  const handleDeleteCategory = async (n) => { const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
+  const handleDeleteCategory = async (n) => { if(!confirm(`⚠️ CAUTION: Delete category "${n}"?\n\nThis action cannot be undone.`)) return; const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
 
   const handleSaveSettings = async () => {
     // Save user's personal color prefs to localStorage only
@@ -1038,7 +1041,8 @@ const AssetManager = ({ user, onLogout }) => {
   };
 
   const handleAddNote = async () => { if(!newNote.trim()||!showNotesModal) return; try { await api('/assets/'+showNotesModal.id+'/notes',{method:'POST',body:JSON.stringify({text:newNote})}); setNewNote(''); loadAllData(); const u=(await api('/assets')).find(a=>a.id===showNotesModal.id); if(u)setShowNotesModal({...showNotesModal,notes:u.notes||[]}); } catch(e){ alert(e.message); } };
-  const handleDeleteNote = async (nid) => { try { await api('/assets/'+showNotesModal.id+'/notes/'+nid,{method:'DELETE'}); loadAllData(); const u=(await api('/assets')).find(a=>a.id===showNotesModal.id); if(u)setShowNotesModal({...showNotesModal,notes:u.notes||[]}); } catch(e){ alert(e.message); } };
+  const loadAuditLog = async () => { try { const log = await api('/audit-log'); setAuditLog(log); setShowAuditLog(true); } catch(e){ alert(e.message); } };
+  const handleDeleteNote = async (nid) => { if(!confirm('⚠️ CAUTION: Delete this note permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+showNotesModal.id+'/notes/'+nid,{method:'DELETE'}); loadAllData(); const u=(await api('/assets')).find(a=>a.id===showNotesModal.id); if(u)setShowNotesModal({...showNotesModal,notes:u.notes||[]}); } catch(e){ alert(e.message); } };
 
   const handlePhotoUpload = async (e, aid) => {
     const files = Array.from(e.target.files); if(!files.length) return;
@@ -1516,6 +1520,7 @@ const AssetManager = ({ user, onLogout }) => {
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowManageCategories(true); }}>🏷️ Categories</button>}
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddLocation(true); }}>📍 Add Location</button>}
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddAsset(true); }}>➕ Add Asset</button>}
+              {isAdminRole && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', background:'rgba(239,68,68,0.1)', borderColor:'rgba(239,68,68,0.3)' }} onClick={() => { setShowSettings(false); loadAuditLog(); }}>🔍 Deletion Log</button>}
             </div>
 
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}><button className="btn-secondary" onClick={() => setShowSettings(false)}>Cancel</button><button className="btn-primary" onClick={handleSaveSettings}>Save</button></div>
@@ -1693,6 +1698,34 @@ const AssetManager = ({ user, onLogout }) => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Audit Log */}
+      {showAuditLog && (
+        <div className="modal-overlay" onClick={() => setShowAuditLog(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:600 }}>
+            <h2 style={{ marginBottom:16 }}>🔍 Deletion Log</h2>
+            <p style={{ color:'#94a3b8', fontSize:12, marginBottom:16 }}>All delete actions are recorded here with who did it and when.</p>
+            <div style={{ maxHeight:400, overflowY:'auto' }}>
+              {auditLog.length === 0 ? (
+                <div style={{ textAlign:'center', padding:24, color:'#64748b' }}>No deletions recorded yet.</div>
+              ) : auditLog.map(entry => (
+                <div key={entry.id} style={{ padding:'12px', marginBottom:8, background:'rgba(239,68,68,0.05)', borderRadius:8, borderLeft:'3px solid #ef4444' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)' }}>
+                      {entry.item_type === 'asset' ? '📦' : entry.item_type === 'photo' ? '📷' : entry.item_type === 'note' ? '📝' : entry.item_type === 'location' ? '📍' : entry.item_type === 'category' ? '🏷️' : '🗑️'} {entry.item_name}
+                    </span>
+                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:4, background:'rgba(239,68,68,0.2)', color:'#f87171', textTransform:'uppercase' }}>{entry.item_type}</span>
+                  </div>
+                  <div style={{ fontSize:11, color:'#64748b' }}>
+                    Deleted by <span style={{ color:'#f59e0b', fontWeight:600 }}>{entry.deleted_by}</span> • {new Date(entry.timestamp).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop:16, textAlign:'right' }}><button className="btn-secondary" onClick={() => setShowAuditLog(false)}>Close</button></div>
           </div>
         </div>
       )}
