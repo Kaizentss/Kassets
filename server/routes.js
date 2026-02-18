@@ -404,7 +404,10 @@ module.exports = (db) => {
 
   router.delete('/locations/:id', auth, canEdit, (req, res) => {
     try {
+      const companyId = getCompanyId(req);
+      const loc = db.getLocation(parseInt(req.params.id));
       db.deleteLocation(parseInt(req.params.id));
+      if (companyId && loc) db.addAuditLog(companyId, 'deleted', 'location', loc.name, req.user.displayName || req.user.username);
       res.json({ message: 'Deleted' });
     } catch (e) {
       res.status(400).json({ error: e.message });
@@ -445,7 +448,10 @@ module.exports = (db) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const cats = db.getCategories(companyId);
+      const cat = cats.find(c => c.id === parseInt(req.params.id));
       db.deleteCategory(parseInt(req.params.id), companyId);
+      if (cat) db.addAuditLog(companyId, 'deleted', 'category', cat.name, req.user.displayName || req.user.username);
       res.json({ message: 'Deleted' });
     } catch (e) {
       res.status(400).json({ error: e.message });
@@ -509,7 +515,10 @@ module.exports = (db) => {
 
   router.delete('/assets/:id', auth, canEdit, (req, res) => {
     try {
+      const asset = db.getAsset(parseInt(req.params.id));
+      const companyId = getCompanyId(req);
       db.deleteAsset(parseInt(req.params.id));
+      if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, req.user.displayName || req.user.username);
       res.json({ message: 'Deleted' });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -550,7 +559,13 @@ module.exports = (db) => {
   router.post('/assets/bulk-delete', auth, canEdit, (req, res) => {
     try {
       const { assetIds } = req.body;
-      assetIds.forEach(id => db.deleteAsset(id));
+      const companyId = getCompanyId(req);
+      const who = req.user.displayName || req.user.username;
+      assetIds.forEach(id => {
+        const asset = db.getAsset(id);
+        db.deleteAsset(id);
+        if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, who);
+      });
       res.json({ message: `${assetIds.length} assets deleted` });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -569,7 +584,10 @@ module.exports = (db) => {
 
   router.delete('/assets/:assetId/photos/:photoId', auth, canEdit, (req, res) => {
     try {
+      const companyId = getCompanyId(req);
+      const asset = db.getAsset(parseInt(req.params.assetId));
       db.deletePhoto(parseInt(req.params.photoId));
+      if (companyId) db.addAuditLog(companyId, 'deleted', 'photo', `Photo from "${asset?.name || 'Unknown'}"`, req.user.displayName || req.user.username);
       res.json({ message: 'Deleted' });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -588,8 +606,28 @@ module.exports = (db) => {
 
   router.delete('/assets/:assetId/notes/:noteId', auth, canEdit, (req, res) => {
     try {
+      const companyId = getCompanyId(req);
+      const asset = db.getAsset(parseInt(req.params.assetId));
       db.deleteNote(parseInt(req.params.noteId));
+      if (companyId) db.addAuditLog(companyId, 'deleted', 'note', `Note from "${asset?.name || 'Unknown'}"`, req.user.displayName || req.user.username);
       res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== AUDIT LOG ==========
+  router.get('/audit-log', auth, isAdmin, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json([]);
+    res.json(db.getAuditLog(companyId));
+  });
+
+  // ========== FULL PLATFORM EXPORT (Super Admin only) ==========
+  router.get('/export-platform', auth, isSuperAdmin, (req, res) => {
+    try {
+      const data = db.exportFullPlatform();
+      res.json(data);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
