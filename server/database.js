@@ -48,7 +48,8 @@ const defaultCompanyData = {
   categories: [],
   settings: [],
   photos: [],
-  notes: []
+  notes: [],
+  audit_log: []
 };
 
 // Cache of loaded company data: { companyId: { data, slug } }
@@ -605,6 +606,40 @@ module.exports = {
         return;
       }
     }
+  },
+
+  // ========== AUDIT LOG ==========
+  addAuditLog: (companyId, action, itemType, itemName, deletedBy) => {
+    const cData = loadCompanyData(companyId);
+    if (!cData.audit_log) cData.audit_log = [];
+    cData.audit_log.push({
+      id: Date.now(),
+      action,
+      item_type: itemType,
+      item_name: itemName,
+      deleted_by: deletedBy,
+      timestamp: new Date().toISOString()
+    });
+    saveCompanyData(companyId);
+  },
+
+  getAuditLog: (companyId) => {
+    const cData = loadCompanyData(companyId);
+    return (cData.audit_log || []).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  // ========== FULL PLATFORM EXPORT (Super Admin) ==========
+  exportFullPlatform: () => {
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      platform: { ...platform },
+      companies_data: {}
+    };
+    for (const company of platform.companies) {
+      const cData = loadCompanyData(company.id);
+      exportData.companies_data[company.id] = { ...cData };
+    }
+    return exportData;
   },
 
   // ========== IMPORT LEGACY (Kassets v1 single-company data) ==========
