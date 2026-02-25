@@ -715,6 +715,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(['master_admin','admin'].includes(user.role) ? 'dashboard' : 'assets');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [sortValue, setSortValue] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
@@ -792,7 +793,11 @@ const AssetManager = ({ user, onLogout }) => {
     const mc = filterCategory==='all' || a.category===filterCategory;
     const ms = a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.category?.toLowerCase().includes(searchTerm.toLowerCase()) || a.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || a.partNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     return ml && mc && ms;
-  }).sort((a,b) => a.name.localeCompare(b.name));
+  }).sort((a,b) => {
+    if (sortValue === 'value-high') return (b.currentValue*b.quantity) - (a.currentValue*a.quantity);
+    if (sortValue === 'value-low') return (a.currentValue*a.quantity) - (b.currentValue*b.quantity);
+    return a.name.localeCompare(b.name);
+  });
 
   // CRUD handlers
   const handleAddAsset = async () => {
@@ -1162,6 +1167,7 @@ const AssetManager = ({ user, onLogout }) => {
               <input type="text" className="input-field" placeholder="Search assets..." style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               <select className="input-field" style={{ maxWidth:180 }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setSelectedAssets([]); }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
               <select className="input-field" style={{ maxWidth:180 }} value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setSelectedAssets([]); }}><option value="all">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+              <button className="btn-secondary" style={{ padding:'10px 16px', fontSize:12, minWidth:100 }} onClick={() => setSortValue(s => s==='name'?'value-high':s==='value-high'?'value-low':'name')}>{sortValue==='value-high'?'💰 High→Low':sortValue==='value-low'?'💰 Low→High':'🔤 A→Z'}</button>
               {canEditData && filteredAssets.length>0 && <button className="btn-secondary" style={{ padding:'10px 16px' }} onClick={selectAll}>{selectedAssets.length===filteredAssets.length?'☑ Deselect All':'☐ Select All'}</button>}
             </div>
             
