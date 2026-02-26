@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 const { auth, isSuperAdmin, isMasterAdmin, isAdmin, canEdit, sameCompany } = require('./middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'kassets-secret-key';
@@ -631,6 +632,50 @@ module.exports = (db) => {
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // ========== PHOTO RESTORE (Super Admin) ==========
+  router.get('/photo-restore/status', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const backupFiles = [];
+      const companiesDir = path.join(__dirname, '..', 'database', 'companies');
+      if (fs.existsSync(companiesDir)) {
+        fs.readdirSync(companiesDir).forEach(f => {
+          if (f.endsWith('-photos-backup.json')) {
+            const stat = fs.statSync(path.join(companiesDir, f));
+            const companySlug = f.replace('-photos-backup.json', '');
+            backupFiles.push({ file: f, slug: companySlug, size: stat.size });
+          }
+        });
+      }
+      res.json({ backups: backupFiles });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.get('/photo-restore/batch/:slug/:offset/:limit', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const { slug, offset, limit } = req.params;
+      const backupPath = path.join(__dirname, '..', 'database', 'companies', `${slug}-photos-backup.json`);
+      if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
+      const photos = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      const start = parseInt(offset);
+      const count = parseInt(limit);
+      const batch = photos.slice(start, start + count);
+      res.json({ total: photos.length, offset: start, batch });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.post('/photo-restore/apply', auth, isSuperAdmin, (req, res) => {
+    try {
+      const { photo } = req.body;
+      if (!photo || !photo.asset_id || !photo.url) return res.status(400).json({ error: 'Invalid photo data' });
+      const asset = db.getAsset(photo.asset_id);
+      if (!asset) return res.json({ skipped: true, reason: 'Asset not found' });
+      const result = db.addPhoto(photo.asset_id, photo.url, photo.name || 'restored');
+      res.json({ restored: true, id: result.id });
+    } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
   // ========== IMPORT LEGACY DATABASE (Super Admin only) ==========
