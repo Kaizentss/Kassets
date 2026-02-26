@@ -635,15 +635,16 @@ module.exports = (db) => {
   });
 
   // ========== PHOTO RESTORE (Super Admin) ==========
+  const restoreCompaniesDir = path.join(__dirname, '..', 'database', 'companies');
+  
   router.get('/photo-restore/status', auth, isSuperAdmin, (req, res) => {
     try {
       const fs = require('fs');
       const backupFiles = [];
-      const companiesDir = path.join(__dirname, '..', 'database', 'companies');
-      if (fs.existsSync(companiesDir)) {
-        fs.readdirSync(companiesDir).forEach(f => {
+      if (fs.existsSync(restoreCompaniesDir)) {
+        fs.readdirSync(restoreCompaniesDir).forEach(f => {
           if (f.endsWith('-photos-backup.json')) {
-            const stat = fs.statSync(path.join(companiesDir, f));
+            const stat = fs.statSync(path.join(restoreCompaniesDir, f));
             const companySlug = f.replace('-photos-backup.json', '');
             backupFiles.push({ file: f, slug: companySlug, size: stat.size });
           }
@@ -653,29 +654,73 @@ module.exports = (db) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
-  router.get('/photo-restore/batch/:slug/:offset/:limit', auth, isSuperAdmin, (req, res) => {
+  router.get('/photo-restore/count/:slug', auth, isSuperAdmin, (req, res) => {
     try {
       const fs = require('fs');
-      const { slug, offset, limit } = req.params;
-      const backupPath = path.join(__dirname, '..', 'database', 'companies', `${slug}-photos-backup.json`);
+      const { slug } = req.params;
+      const splitDir = path.join(restoreCompaniesDir, `${slug}-photos-split`);
+      
+      // Check if already split
+      if (fs.existsSync(splitDir)) {
+        const files = fs.readdirSync(splitDir).filter(f => f.endsWith('.json'));
+        return res.json({ total: files.length, slug, split: true });
+      }
+      
+      // Check if backup exists
+      const backupPath = path.join(restoreCompaniesDir, `${slug}-photos-backup.json`);
       if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
-      const photos = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
-      const start = parseInt(offset);
-      const count = parseInt(limit);
-      const batch = photos.slice(start, start + count);
-      res.json({ total: photos.length, offset: start, batch });
+      
+      return res.json({ total: 0, slug, split: false, needsSplit: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
-  router.post('/photo-restore/apply', auth, isSuperAdmin, (req, res) => {
+  router.post('/photo-restore/split/:slug', auth, isSuperAdmin, (req, res) => {
     try {
-      const { photo } = req.body;
-      if (!photo || !photo.asset_id || !photo.url) return res.status(400).json({ error: 'Invalid photo data' });
-      const asset = db.getAsset(photo.asset_id);
-      if (!asset) return res.json({ skipped: true, reason: 'Asset not found' });
-      const result = db.addPhoto(photo.asset_id, photo.url, photo.name || 'restored');
-      res.json({ restored: true, id: result.id });
+      const fs = require('fs');
+      const { slug } = req.params;
+      const backupPath = path.join(restoreCompaniesDir, `${slug}-photos-backup.json`);
+      if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
+      
+      // This will use a lot of memory but only happens once
+      const photos = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      const splitDir = path.join(restoreCompaniesDir, `${slug}-photos-split`);
+      if (!fs.existsSync(splitDir)) fs.mkdirSync(splitDir, { recursive: true });
+      
+      for (let i = 0; i < photos.length; i++) {
+        fs.writeFileSync(path.join(splitDir, `${i}.json`), JSON.stringify(photos[i]));
+      }
+      
+      const count = photos.length;
+      photos.length = 0;
+      res.json({ split: true, total: count });
     } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.post('/photo-restore/restore-one/:slug/:index', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const { slug, index } = req.params;
+      const idx = parseInt(index);
+      const photoPath = path.join(restoreCompaniesDir, `${slug}-photos-split`, `${idx}.json`);
+      
+      if (!fs.existsSync(photoPath)) return res.json({ done: true });
+      
+      const photo = JSON.parse(fs.readFileSync(photoPath, 'utf8'));
+      
+      if (!photo || !photo.asset_id || !photo.url) {
+        return res.json({ skipped: true, index: idx, reason: 'Invalid photo data' });
+      }
+      
+      const asset = db.getAsset(photo.asset_id);
+      if (!asset) {
+        return res.json({ skipped: true, index: idx, reason: `Asset #${photo.asset_id} not found` });
+      }
+      
+      db.addPhoto(photo.asset_id, photo.url, photo.name || 'restored');
+      res.json({ restored: true, index: idx, assetId: photo.asset_id });
+    } catch(e) { 
+      res.status(500).json({ error: e.message }); 
+    }
   });
 
   // ========== IMPORT LEGACY DATABASE (Super Admin only) ==========
