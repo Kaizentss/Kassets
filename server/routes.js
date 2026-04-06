@@ -482,7 +482,7 @@ module.exports = (db) => {
         purchase_date: purchaseDate || '',
         purchase_cost: parseFloat(purchaseCost) || 0,
         current_value: parseFloat(currentValue) || parseFloat(purchaseCost) || 0,
-        quantity: parseInt(quantity) || 1,
+        quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: parseFloat(depreciationRate) || 10,
         location_id: locationId ? parseInt(locationId) : null
       });
@@ -504,7 +504,7 @@ module.exports = (db) => {
         purchase_date: purchaseDate,
         purchase_cost: parseFloat(purchaseCost) || 0,
         current_value: parseFloat(currentValue) || 0,
-        quantity: parseInt(quantity) || 1,
+        quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: parseFloat(depreciationRate) || 10,
         location_id: locationId ? parseInt(locationId) : null
       });
