@@ -1192,7 +1192,7 @@ const AssetManager = ({ user, onLogout }) => {
                       {asset.photos?.length>0 ? <img src={asset.photos[0].url} onClick={() => setShowPhotoViewer(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
                       <div>
                         <h4 style={{ margin:0, fontSize:15 }}>{asset.name}</h4>
-                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color:'#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&` • ${asset.description}`}</p>
+                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: asset.description.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>') }} /></span>}</p>
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
@@ -1348,7 +1348,14 @@ const AssetManager = ({ user, onLogout }) => {
               <input className="input-field" placeholder="Serial Number" value={newAsset.serialNumber} onChange={e => setNewAsset({...newAsset, serialNumber:e.target.value})} />
               <input className="input-field" placeholder="Part Number" value={newAsset.partNumber} onChange={e => setNewAsset({...newAsset, partNumber:e.target.value})} />
             </div>
-            <textarea className="input-field" placeholder="Description" value={newAsset.description} onChange={e => setNewAsset({...newAsset, description:e.target.value})} rows={2} style={{ marginBottom:12, resize:'vertical' }} />
+            <div style={{ marginBottom:12 }}>
+              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                <button type="button" title="Bold" style={{ padding:'3px 10px', fontSize:13, fontWeight:700, background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('addDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=newAsset.description; if(s===e){setNewAsset({...newAsset,description:v+'****'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,s+2)},0)} else {setNewAsset({...newAsset,description:v.slice(0,s)+'**'+v.slice(s,e)+'**'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,e+2)},0)} }}>B</button>
+                <button type="button" title="Italic" style={{ padding:'3px 10px', fontSize:13, fontStyle:'italic', background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('addDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=newAsset.description; if(s===e){setNewAsset({...newAsset,description:v+'__'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,s+1)},0)} else {setNewAsset({...newAsset,description:v.slice(0,s)+'_'+v.slice(s,e)+'_'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,e+1)},0)} }}>I</button>
+                <span style={{ fontSize:10, color:'#64748b', alignSelf:'center', marginLeft:6 }}>Select text → B or I</span>
+              </div>
+              <textarea id="addDesc" className="input-field" placeholder="Description" value={newAsset.description} onChange={e => setNewAsset({...newAsset, description:e.target.value})} rows={2} style={{ resize:'vertical' }} />
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Date</label><input className="input-field" type="date" value={newAsset.purchaseDate} onChange={e => setNewAsset({...newAsset, purchaseDate:e.target.value})} /></div>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Cost</label><input className="input-field" type="number" value={newAsset.purchaseCost} onChange={e => setNewAsset({...newAsset, purchaseCost:e.target.value})} /></div>
@@ -1411,7 +1418,14 @@ const AssetManager = ({ user, onLogout }) => {
               <input className="input-field" placeholder="Serial Number" value={editingAsset.serialNumber||''} onChange={e => setEditingAsset({...editingAsset, serialNumber:e.target.value})} />
               <input className="input-field" placeholder="Part Number" value={editingAsset.partNumber||''} onChange={e => setEditingAsset({...editingAsset, partNumber:e.target.value})} />
             </div>
-            <textarea className="input-field" placeholder="Description" value={editingAsset.description||''} onChange={e => setEditingAsset({...editingAsset, description:e.target.value})} rows={2} style={{ marginBottom:12, resize:'vertical' }} />
+            <div style={{ marginBottom:12 }}>
+              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                <button type="button" title="Bold" style={{ padding:'3px 10px', fontSize:13, fontWeight:700, background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('editDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=editingAsset.description||''; if(s===e){setEditingAsset({...editingAsset,description:v+'****'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,s+2)},0)} else {setEditingAsset({...editingAsset,description:v.slice(0,s)+'**'+v.slice(s,e)+'**'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,e+2)},0)} }}>B</button>
+                <button type="button" title="Italic" style={{ padding:'3px 10px', fontSize:13, fontStyle:'italic', background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('editDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=editingAsset.description||''; if(s===e){setEditingAsset({...editingAsset,description:v+'__'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,s+1)},0)} else {setEditingAsset({...editingAsset,description:v.slice(0,s)+'_'+v.slice(s,e)+'_'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,e+1)},0)} }}>I</button>
+                <span style={{ fontSize:10, color:'#64748b', alignSelf:'center', marginLeft:6 }}>Select text → B or I</span>
+              </div>
+              <textarea id="editDesc" className="input-field" placeholder="Description" value={editingAsset.description||''} onChange={e => setEditingAsset({...editingAsset, description:e.target.value})} rows={2} style={{ resize:'vertical' }} />
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Date</label><input className="input-field" type="date" value={editingAsset.purchaseDate||''} onChange={e => setEditingAsset({...editingAsset, purchaseDate:e.target.value})} /></div>
               <div><label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Purchase Cost</label><input className="input-field" type="number" value={editingAsset.purchaseCost} onChange={e => setEditingAsset({...editingAsset, purchaseCost:e.target.value})} /></div>
@@ -1641,16 +1655,9 @@ const AssetManager = ({ user, onLogout }) => {
         <div className="modal-overlay" onClick={() => { setShowNotesModal(null); setNewNote(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom:16 }}>📝 Notes: {showNotesModal.name}</h2>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-                <button type="button" title="Bold" style={{ padding:'4px 10px', fontSize:13, fontWeight:700, background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('noteInput'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd; if(s===e){setNewNote(newNote+'****'); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,s+2)},0)} else {const before=newNote.slice(0,s),sel=newNote.slice(s,e),after=newNote.slice(e); setNewNote(before+'**'+sel+'**'+after); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,e+2)},0)} }}>B</button>
-                <button type="button" title="Italic" style={{ padding:'4px 10px', fontSize:13, fontStyle:'italic', background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('noteInput'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd; if(s===e){setNewNote(newNote+'__'); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,s+1)},0)} else {const before=newNote.slice(0,s),sel=newNote.slice(s,e),after=newNote.slice(e); setNewNote(before+'_'+sel+'_'+after); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,e+1)},0)} }}>I</button>
-                <span style={{ fontSize:10, color:'#64748b', alignSelf:'center', marginLeft:8 }}>Select text then click B or I</span>
-              </div>
-              <div style={{ display:'flex', gap:8 }}>
-                <textarea id="noteInput" className="input-field" placeholder="Add a note... Use **bold** or _italic_" value={newNote} onChange={e => setNewNote(e.target.value)} rows={2} style={{ resize:'vertical' }} />
-                <button className="btn-primary" style={{ alignSelf:'flex-end' }} onClick={handleAddNote}>Add</button>
-              </div>
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+              <textarea className="input-field" placeholder="Add a note..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={2} style={{ resize:'vertical' }} />
+              <button className="btn-primary" style={{ alignSelf:'flex-end' }} onClick={handleAddNote}>Add</button>
             </div>
             <div style={{ maxHeight:300, overflowY:'auto' }}>
               {(showNotesModal.notes||[]).map(n => (
@@ -1659,7 +1666,7 @@ const AssetManager = ({ user, onLogout }) => {
                     <span style={{ fontSize:11, color:'#64748b' }}>{n.created_by} • {new Date(n.created_at).toLocaleString()}</span>
                     {isAdminRole && <button onClick={() => handleDeleteNote(n.id)} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer' }}>✕</button>}
                   </div>
-                  <p style={{ margin:0, whiteSpace:'pre-wrap' }} dangerouslySetInnerHTML={{ __html: (n.text||'').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>') }} />
+                  <p style={{ margin:0, whiteSpace:'pre-wrap' }}>{n.text}</p>
                 </div>
               ))}
             </div>
