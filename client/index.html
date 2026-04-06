@@ -717,7 +717,6 @@ const AssetManager = ({ user, onLogout }) => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [sortValue, setSortValue] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchNotes, setSearchNotes] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
@@ -792,9 +791,8 @@ const AssetManager = ({ user, onLogout }) => {
   const filteredAssets = assets.filter(a => {
     const ml = filterLocation==='all' || a.locationId===parseInt(filterLocation);
     const mc = filterCategory==='all' || a.category===filterCategory;
-    const ms = searchNotes
-      ? (a.description?.toLowerCase().includes(searchTerm.toLowerCase()) || (a.notes||[]).some(n => n.text?.toLowerCase().includes(searchTerm.toLowerCase())))
-      : a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.category?.toLowerCase().includes(searchTerm.toLowerCase()) || a.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || a.partNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    const st = searchTerm.toLowerCase();
+    const ms = !st || a.name.toLowerCase().includes(st) || a.category?.toLowerCase().includes(st) || a.serialNumber?.toLowerCase().includes(st) || a.partNumber?.toLowerCase().includes(st) || a.description?.toLowerCase().includes(st) || (a.notes||[]).some(n => n.text?.toLowerCase().includes(st));
     return ml && mc && ms;
   }).sort((a,b) => {
     if (sortValue === 'value-high') return (b.currentValue*b.quantity) - (a.currentValue*a.quantity);
@@ -1167,8 +1165,7 @@ const AssetManager = ({ user, onLogout }) => {
         {activeTab === 'assets' && (
           <div>
             <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
-              <input type="text" className="input-field" placeholder={searchNotes ? "Search descriptions & notes..." : "Search assets..."} style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-              <button className="btn-secondary" title={searchNotes ? "Searching descriptions & notes" : "Searching name, category, serial, part#"} style={{ padding:'10px 14px', fontSize:12, background: searchNotes ? 'rgba(251,191,36,0.2)' : undefined, borderColor: searchNotes ? 'rgba(251,191,36,0.4)' : undefined }} onClick={() => { setSearchNotes(!searchNotes); setSearchTerm(''); }}>{searchNotes ? '📝 Notes' : '🔤 Title'}</button>
+              <input type="text" className="input-field" placeholder="Search assets..." style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               <select className="input-field" style={{ maxWidth:180 }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setSelectedAssets([]); }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
               <select className="input-field" style={{ maxWidth:180 }} value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setSelectedAssets([]); }}><option value="all">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
               <button className="btn-secondary" style={{ padding:'10px 16px', fontSize:12, minWidth:100 }} onClick={() => setSortValue(s => s==='name'?'value-high':s==='value-high'?'value-low':'name')}>{sortValue==='value-high'?'💰 High→Low':sortValue==='value-low'?'💰 Low→High':'🔤 A→Z'}</button>
