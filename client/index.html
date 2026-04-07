@@ -7,6 +7,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -739,6 +740,11 @@ const AssetManager = ({ user, onLogout }) => {
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [auditLog, setAuditLog] = useState([]);
+  const [showKeylistImport, setShowKeylistImport] = useState(false);
+  const [keylistData, setKeylistData] = useState([]);
+  const [keylistImporting, setKeylistImporting] = useState({ active:false, current:0, total:0, name:'' });
+  const [keylistCategory, setKeylistCategory] = useState('');
+  const [keylistLocation, setKeylistLocation] = useState('');
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
   const [newNote, setNewNote] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -1048,6 +1054,81 @@ const AssetManager = ({ user, onLogout }) => {
 
   const handleAddNote = async () => { if(!newNote.trim()||!showNotesModal) return; try { await api('/assets/'+showNotesModal.id+'/notes',{method:'POST',body:JSON.stringify({text:newNote})}); setNewNote(''); loadAllData(); const u=(await api('/assets')).find(a=>a.id===showNotesModal.id); if(u)setShowNotesModal({...showNotesModal,notes:u.notes||[]}); } catch(e){ alert(e.message); } };
   const loadAuditLog = async () => { try { const log = await api('/audit-log'); setAuditLog(log); setShowAuditLog(true); } catch(e){ alert(e.message); } };
+
+  const parseKeylistExcel = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+        const assets = [];
+        let i = 0;
+        while (i < rows.length) {
+          const row = rows[i];
+          if (String(row[7]||'').trim() === 'Qty') {
+            const fccId = String(row[2]||'').trim();
+            const skuRaw = String(row[3]||'').trim();
+            const bladeInfo = String(row[4]||'').trim();
+            let sku = skuRaw.toUpperCase().includes('SKU') ? skuRaw.replace(/SKU:?\s*/i,'').trim() : skuRaw;
+            if (!sku && bladeInfo.includes('SKU:')) { const m=bladeInfo.match(/SKU:\s*(\S+)/); if(m) sku=m[1]; }
+            if (i+1 < rows.length) {
+              const dr = rows[i+1];
+              const pnRaw = String(dr[2]||'').trim();
+              const keyType = String(dr[3]||'').trim();
+              const vehRaw = String(dr[4]||'').trim();
+              const buttons = String(dr[6]||'').trim();
+              const qty = parseInt(dr[7]) || 0;
+              const price = parseFloat(dr[8]) || 0;
+              const battery = String(dr[10]||'').trim();
+              let freq = '';
+              if (i+2 < rows.length) { const f=String(rows[i+2][2]||'').trim(); if(f.toLowerCase().includes('mhz')||f.toLowerCase().includes('ghz')) freq=f; }
+              const pn = pnRaw.replace(/^PN:?\s*/i,'').trim();
+              const blade = bladeInfo.split('\n')[0].replace(/^Blade\s*-?\s*/i,'').trim();
+              const vehicles = [];
+              if (vehRaw) { const v=vehRaw.split('\n')[0].replace(/_$/,'').trim(); if(v) vehicles.push(v); }
+              let j = i+2;
+              while (j < rows.length) {
+                if (String(rows[j][7]||'').trim() === 'Qty') break;
+                const v = String(rows[j][4]||'').trim();
+                if (v) { const vn=v.split('\n')[0].replace(/_$/,'').trim(); const yr=String(rows[j][5]||'').trim(); if(vn) vehicles.push(yr?`${vn} ${yr}`:vn); }
+                j++;
+              }
+              const desc = [];
+              if (freq) desc.push('Frequency: '+freq);
+              if (buttons) desc.push('Buttons: '+buttons);
+              if (keyType) desc.push('Type: '+keyType);
+              if (blade) desc.push('Blade: '+blade);
+              if (battery) desc.push('Battery: '+(String(battery).startsWith('CR')?battery:'CR'+battery));
+              if (vehicles.length) desc.push('Vehicles: '+vehicles.join(', '));
+              assets.push({ name:fccId, serialNumber:sku, partNumber:pn, description:desc.join('\n'), quantity:qty, currentValue:price, purchaseCost:price });
+            }
+          }
+          i++;
+        }
+        setKeylistData(assets);
+        setShowKeylistImport(true);
+      } catch(err) { alert('Error parsing file: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleKeylistImport = async () => {
+    if (!keylistCategory || !keylistLocation) return alert('Select a category and location');
+    setKeylistImporting({ active:true, current:0, total:keylistData.length, name:'' });
+    let ok=0, skip=0;
+    for (let i=0; i<keylistData.length; i++) {
+      const a = keylistData[i];
+      setKeylistImporting({ active:true, current:i+1, total:keylistData.length, name:a.name });
+      try {
+        await api('/assets', { method:'POST', body:JSON.stringify({ name:a.name, category:keylistCategory, serialNumber:a.serialNumber, partNumber:a.partNumber, description:a.description, purchaseDate:new Date().toISOString().split('T')[0], purchaseCost:a.purchaseCost, currentValue:a.currentValue, quantity:a.quantity, locationId:parseInt(keylistLocation) }) });
+        ok++;
+      } catch(e) { skip++; }
+    }
+    setKeylistImporting({ active:false, current:0, total:0, name:'' });
+    setShowKeylistImport(false); setKeylistData([]); loadAllData();
+    alert(`Import complete! ${ok} assets imported, ${skip} skipped.`);
+  };
   const handleDeleteNote = async (nid) => { if(!confirm('⚠️ CAUTION: Delete this note permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+showNotesModal.id+'/notes/'+nid,{method:'DELETE'}); loadAllData(); const u=(await api('/assets')).find(a=>a.id===showNotesModal.id); if(u)setShowNotesModal({...showNotesModal,notes:u.notes||[]}); } catch(e){ alert(e.message); } };
 
   const handlePhotoUpload = async (e, aid) => {
@@ -1542,6 +1623,7 @@ const AssetManager = ({ user, onLogout }) => {
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddLocation(true); }}>📍 Add Location</button>}
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddAsset(true); }}>➕ Add Asset</button>}
               {isAdminRole && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', background:'rgba(239,68,68,0.1)', borderColor:'rgba(239,68,68,0.3)' }} onClick={() => { setShowSettings(false); loadAuditLog(); }}>🔍 Deletion Log</button>}
+              {isAdminRole && <label className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', cursor:'pointer', background:'rgba(34,197,94,0.1)', borderColor:'rgba(34,197,94,0.3)' }}><input type="file" accept=".xlsx,.xls" style={{ display:'none' }} onChange={e => { if(e.target.files[0]){ setShowSettings(false); parseKeylistExcel(e.target.files[0]); } }} />📥 Import Keylist</label>}
             </div>
 
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}><button className="btn-secondary" onClick={() => setShowSettings(false)}>Cancel</button><button className="btn-primary" onClick={handleSaveSettings}>Save</button></div>
@@ -1717,6 +1799,68 @@ const AssetManager = ({ user, onLogout }) => {
                 {showPhotoViewer.photos.map(p => (
                   <img key={p.id} src={p.url} onClick={() => setFullscreenPhoto(p)} style={{ width:50, height:50, objectFit:'cover', borderRadius:6, cursor:'pointer', border:p.id===fullscreenPhoto.id?'2px solid #ffd700':'2px solid transparent', opacity:p.id===fullscreenPhoto.id?1:0.6 }} />
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Keylist Import */}
+      {showKeylistImport && (
+        <div className="modal-overlay" onClick={() => { if(!keylistImporting.active) setShowKeylistImport(false); }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:650 }}>
+            <h2 style={{ marginBottom:8 }}>📥 Import Keylist</h2>
+            {keylistImporting.active ? (
+              <div>
+                <p style={{ color:'#94a3b8', fontSize:13, marginBottom:16 }}>Importing assets... please wait.</p>
+                <div style={{ marginBottom:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#94a3b8', marginBottom:6 }}>
+                    <span>📦 {keylistImporting.name}</span>
+                    <span>{keylistImporting.current} / {keylistImporting.total}</span>
+                  </div>
+                  <div style={{ background:'rgba(148,163,184,0.2)', borderRadius:8, height:12, overflow:'hidden' }}>
+                    <div style={{ background:'linear-gradient(90deg, #22c55e, #3b82f6)', height:'100%', borderRadius:8, transition:'width 0.3s', width:`${(keylistImporting.current/keylistImporting.total)*100}%` }} />
+                  </div>
+                  <p style={{ fontSize:11, color:'#64748b', marginTop:6, textAlign:'center' }}>{Math.round((keylistImporting.current/keylistImporting.total)*100)}% complete</p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ color:'#94a3b8', fontSize:13, marginBottom:16 }}>Found <b style={{ color:'#22c55e' }}>{keylistData.length}</b> assets in the keylist. Select a category and location to import them into.</p>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+                  <div>
+                    <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Category</label>
+                    <select className="input-field" value={keylistCategory} onChange={e => setKeylistCategory(e.target.value)}>
+                      <option value="">Select category</option>
+                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>Location</label>
+                    <select className="input-field" value={keylistLocation} onChange={e => setKeylistLocation(e.target.value)}>
+                      <option value="">Select location</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ background:'rgba(30,41,59,0.5)', borderRadius:10, padding:12, marginBottom:16, maxHeight:250, overflowY:'auto', border:'1px solid rgba(148,163,184,0.1)' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 0.5fr 0.8fr', gap:4, padding:'4px 0', borderBottom:'1px solid rgba(148,163,184,0.2)', fontSize:11, color:'#94a3b8', fontWeight:600 }}>
+                    <span>FCC ID</span><span>SKU</span><span>Part #</span><span>Qty</span><span>Price</span>
+                  </div>
+                  {keylistData.map((a,idx) => (
+                    <div key={idx} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 0.5fr 0.8fr', gap:4, padding:'4px 0', borderBottom:'1px solid rgba(148,163,184,0.05)', fontSize:11 }}>
+                      <span style={{ color:'#e2e8f0' }}>{a.name}</span>
+                      <span style={{ color:'#64748b' }}>{a.serialNumber}</span>
+                      <span style={{ color:'#64748b' }}>{a.partNumber?.slice(0,20)}</span>
+                      <span style={{ color: a.quantity===0?'#ef4444':'#fbbf24', fontWeight:600 }}>{a.quantity}</span>
+                      <span style={{ color:'#34d399' }}>${a.currentValue}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
+                  <button className="btn-secondary" onClick={() => { setShowKeylistImport(false); setKeylistData([]); }}>Cancel</button>
+                  <button className="btn-primary" onClick={handleKeylistImport} disabled={!keylistCategory||!keylistLocation} style={{ background:'linear-gradient(135deg,#22c55e,#3b82f6)' }}>📥 Import {keylistData.length} Assets</button>
+                </div>
               </div>
             )}
           </div>
