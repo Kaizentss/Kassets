@@ -732,6 +732,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [showBulkDuplicate, setShowBulkDuplicate] = useState(false);
   const [bulkDuplicateTo, setBulkDuplicateTo] = useState('');
   const [bulkDupProgress, setBulkDupProgress] = useState({ active:false, current:0, total:0, currentName:'' });
+  const [bulkDupCopyPhotos, setBulkDupCopyPhotos] = useState(false);
   const [bulkTransferTo, setBulkTransferTo] = useState('');
   const [bulkCategoryTo, setBulkCategoryTo] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
@@ -838,7 +839,7 @@ const AssetManager = ({ user, onLogout }) => {
   };
 
   const handleDeleteAsset = async (id) => { const a = assets.find(x=>x.id===id); if (!confirm(`⚠️ CAUTION: You are about to permanently delete:\n\n"${a?.name || 'this asset'}"\n\nThis action cannot be undone. All photos and notes for this asset will also be deleted.\n\nAre you sure?`)) return; try { await api('/assets/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
-  const handleDuplicate = async (a) => { try { const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} loadAllData(); } catch(e){ alert(e.message); } };
+  const handleDuplicate = async (a) => { try { const copyPhotos = a.photos?.length > 0 ? confirm(`This asset has ${a.photos.length} photo(s).\n\nCopy photos to the duplicate?`) : false; const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(copyPhotos && a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} loadAllData(); } catch(e){ alert(e.message); } };
   
   const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); loadAllData(); if(editingAsset){const u=(await api('/assets')).find(a=>a.id===aid);if(u)setEditingAsset({...editingAsset,photos:u.photos||[]});} } catch(e){ alert(e.message); } };
   
@@ -854,10 +855,10 @@ const AssetManager = ({ user, onLogout }) => {
         const a = toDup[i];
         setBulkDupProgress({ active:true, current:i+1, total:toDup.length, currentName:a.name });
         const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:parseInt(bulkDuplicateTo)})});
-        if(a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}}
+        if(bulkDupCopyPhotos && a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}}
       }
       setBulkDupProgress({ active:false, current:0, total:0, currentName:'' });
-      setShowBulkDuplicate(false); setSelectedAssets([]); setBulkDuplicateTo(''); loadAllData();
+      setShowBulkDuplicate(false); setSelectedAssets([]); setBulkDuplicateTo(''); setBulkDupCopyPhotos(false); loadAllData();
     } catch(e){ setBulkDupProgress({ active:false, current:0, total:0, currentName:'' }); alert(e.message); }
   };
 
@@ -1926,7 +1927,12 @@ const AssetManager = ({ user, onLogout }) => {
                   ))}
                 </div>
                 <label style={{ display:'block', marginBottom:6, fontSize:13, color:'#94a3b8' }}>Destination Location</label>
-                <select className="input-field" value={bulkDuplicateTo} onChange={e => setBulkDuplicateTo(e.target.value)} style={{ marginBottom:20 }}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+                <select className="input-field" value={bulkDuplicateTo} onChange={e => setBulkDuplicateTo(e.target.value)} style={{ marginBottom:16 }}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+                <label style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, cursor:'pointer', fontSize:13, color:'#e2e8f0' }} onClick={() => setBulkDupCopyPhotos(!bulkDupCopyPhotos)}>
+                  <div style={{ width:22, height:22, borderRadius:6, border: bulkDupCopyPhotos ? '2px solid #3b82f6' : '2px solid #475569', background: bulkDupCopyPhotos ? '#3b82f6' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{bulkDupCopyPhotos && <span style={{ color:'white', fontSize:12 }}>✓</span>}</div>
+                  📷 Copy photos to duplicates
+                  {bulkDupCopyPhotos && <span style={{ fontSize:11, color:'#f59e0b' }}>(increases storage usage)</span>}
+                </label>
                 <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}><button className="btn-secondary" onClick={() => setShowBulkDuplicate(false)}>Cancel</button><button className="btn-primary" onClick={handleBulkDuplicate} disabled={!bulkDuplicateTo}>Duplicate All</button></div>
               </div>
             )}
