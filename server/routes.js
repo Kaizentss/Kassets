@@ -574,6 +574,15 @@ module.exports = (db) => {
   });
 
   // ========== PHOTOS ==========
+  router.get('/assets/:id/photos', auth, (req, res) => {
+    try {
+      const photos = db.getPhotos(parseInt(req.params.id));
+      res.json(photos);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   router.post('/assets/:id/photos', auth, canEdit, (req, res) => {
     try {
       const photo = db.addPhoto(parseInt(req.params.id), req.body.url, req.body.name);
