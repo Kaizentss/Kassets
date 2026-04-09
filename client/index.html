@@ -85,7 +85,8 @@
       th, td { border: 1px solid #ccc !important; padding: 8px !important; color: black !important; }
       th { background: #f0f0f0 !important; }
       tr:last-child { background: #e0e0e0 !important; font-weight: bold !important; }
-      @page { margin: 0.5in; size: landscape; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    @page { margin: 0.5in; size: landscape; }
     }
   </style>
 </head>
@@ -739,6 +740,25 @@ const AssetManager = ({ user, onLogout }) => {
   const [editingLocation, setEditingLocation] = useState(null);
   const [showNotesModal, setShowNotesModal] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
+  const [loadingAction, setLoadingAction] = useState('');
+
+  const loadAndShowPhotos = async (asset) => {
+    setLoadingAction('Loading photos...');
+    try {
+      const photos = await api('/assets/'+asset.id+'/photos');
+      setShowPhotoViewer({ ...asset, photos });
+    } catch(e) { alert(e.message); }
+    setLoadingAction('');
+  };
+
+  const loadPhotosForEdit = async (asset) => {
+    setLoadingAction('Loading asset...');
+    try {
+      const photos = await api('/assets/'+asset.id+'/photos');
+      setEditingAsset({ ...asset, photos });
+    } catch(e) { setEditingAsset({ ...asset, photos: [] }); }
+    setLoadingAction('');
+  };
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [auditLog, setAuditLog] = useState([]);
   const [showKeylistImport, setShowKeylistImport] = useState(false);
@@ -810,6 +830,7 @@ const AssetManager = ({ user, onLogout }) => {
   // CRUD handlers
   const handleAddAsset = async () => {
     if (!newAsset.name) return alert('Name required');
+    setLoadingAction('Adding asset...');
     try {
       const d = { ...newAsset, purchaseCost:parseFloat(newAsset.purchaseCost)||0, currentValue:parseFloat(newAsset.currentValue)||0, quantity:parseInt(newAsset.quantity)>=0?parseInt(newAsset.quantity):1 };
       delete d.photos;
@@ -817,9 +838,11 @@ const AssetManager = ({ user, onLogout }) => {
       if (newAsset.photos?.length > 0) { for (const p of newAsset.photos) { await api('/assets/'+r.id+'/photos', { method:'POST', body:JSON.stringify({ url:p.url, name:p.name }) }); } }
       setShowAddAsset(false); setNewAsset({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] }); loadAllData();
     } catch (e) { alert(e.message); }
+    setLoadingAction('');
   };
 
   const handleUpdateAsset = async () => {
+    setLoadingAction('Saving changes...');
     try {
       const orig = assets.find(a => a.id === editingAsset.id);
       const notes = [];
@@ -836,12 +859,13 @@ const AssetManager = ({ user, onLogout }) => {
       for (const n of notes) { await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); }
       setEditingAsset(null); loadAllData();
     } catch (e) { alert(e.message); }
+    setLoadingAction('');
   };
 
-  const handleDeleteAsset = async (id) => { const a = assets.find(x=>x.id===id); if (!confirm(`⚠️ CAUTION: You are about to permanently delete:\n\n"${a?.name || 'this asset'}"\n\nThis action cannot be undone. All photos and notes for this asset will also be deleted.\n\nAre you sure?`)) return; try { await api('/assets/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleDeleteAsset = async (id) => { const a = assets.find(x=>x.id===id); if (!confirm(`⚠️ CAUTION: You are about to permanently delete:\n\n"${a?.name || 'this asset'}"\n\nThis action cannot be undone. All photos and notes for this asset will also be deleted.\n\nAre you sure?`)) return; setLoadingAction('Deleting asset...'); try { await api('/assets/'+id,{method:'DELETE'}); await loadAllData(); } catch(e){ alert(e.message); } setLoadingAction(''); };
   const handleDuplicate = async (a) => { try { const copyPhotos = a.photos?.length > 0 ? confirm(`This asset has ${a.photos.length} photo(s).\n\nCopy photos to the duplicate?`) : false; const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(copyPhotos && a.photos?.length>0){for(const p of a.photos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} loadAllData(); } catch(e){ alert(e.message); } };
   
-  const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); loadAllData(); if(editingAsset){const u=(await api('/assets')).find(a=>a.id===aid);if(u)setEditingAsset({...editingAsset,photos:u.photos||[]});} } catch(e){ alert(e.message); } };
+  const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; setLoadingAction('Deleting photo...'); try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); await loadAllData(); if(editingAsset){const photos=await api('/assets/'+aid+'/photos'); setEditingAsset({...editingAsset,photos});} } catch(e){ alert(e.message); } setLoadingAction(''); };
   
   const handleBulkTransfer = async () => { if(!bulkTransferTo) return; try { await api('/assets/bulk-transfer',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,locationId:parseInt(bulkTransferTo)})}); setShowBulkTransfer(false); setSelectedAssets([]); setBulkTransferTo(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleBulkCategory = async () => { if(!bulkCategoryTo) return; try { await api('/assets/bulk-category',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,category:bulkCategoryTo})}); setShowBulkCategory(false); setSelectedAssets([]); setBulkCategoryTo(''); loadAllData(); } catch(e){ alert(e.message); } };
@@ -1271,7 +1295,7 @@ const AssetManager = ({ user, onLogout }) => {
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12, flex:1, minWidth:200 }}>
                       {canEditData && <div onClick={() => toggleSelect(asset.id)} style={{ width:22, height:22, borderRadius:6, border:selectedAssets.includes(asset.id)?'2px solid #3b82f6':'2px solid #475569', background:selectedAssets.includes(asset.id)?'#3b82f6':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{selectedAssets.includes(asset.id) && <span style={{ color:'white', fontSize:12 }}>✓</span>}</div>}
-                      {asset.photos?.length>0 ? <img src={asset.photos[0].url} onClick={() => setShowPhotoViewer(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
+                      {asset.thumbnail ? <img src={asset.thumbnail} onClick={() => loadAndShowPhotos(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
                       <div>
                         <h4 style={{ margin:0, fontSize:15 }}>{asset.name}</h4>
                         <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: asset.description.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>') }} /></span>}</p>
@@ -1281,10 +1305,10 @@ const AssetManager = ({ user, onLogout }) => {
                       <span className="category-badge">{asset.category}</span>
                       <span className="location-badge">{getLocationName(asset.locationId)}</span>
                       {isAdminRole && <span style={{ fontFamily:"'JetBrains Mono', monospace", color:'#34d399', minWidth:80, textAlign:'right', fontSize:13 }}>{formatCurrency(asset.currentValue*asset.quantity)}</span>}
-                      {asset.photos?.length>1 && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => setShowPhotoViewer(asset)}>+{asset.photos.length-1} more</button>}
+                      {asset.photos?.length>1 && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadAndShowPhotos(asset)}>+{asset.photos.length-1} more</button>}
                       <button title="Notes" className="btn-secondary" style={{ padding:'5px 10px', fontSize:11, background:asset.notes?.length?'rgba(251,191,36,0.2)':undefined }} onClick={() => setShowNotesModal(asset)}>📝 {asset.notes?.length||''}</button>
                       {canEditData && <button title="Copy" className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDuplicate(asset)}>📋</button>}
-                      {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => setEditingAsset({...asset})}>Edit</button>}
+                      {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadPhotosForEdit(asset)}>Edit</button>}
                       {isAdminRole && <button className="btn-danger" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDeleteAsset(asset.id)}>Delete</button>}
                     </div>
                   </div>
@@ -1754,6 +1778,16 @@ const AssetManager = ({ user, onLogout }) => {
               ))}
             </div>
             <div style={{ marginTop:20, textAlign:'right' }}><button className="btn-secondary" onClick={() => { setShowNotesModal(null); setNewNote(''); }}>Close</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {loadingAction && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'rgba(30,41,59,0.95)', borderRadius:16, padding:'24px 40px', textAlign:'center', border:'1px solid rgba(148,163,184,0.2)' }}>
+            <div style={{ width:40, height:40, border:'3px solid rgba(148,163,184,0.3)', borderTopColor:'#3b82f6', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }} />
+            <p style={{ color:'#e2e8f0', fontSize:14 }}>{loadingAction}</p>
           </div>
         </div>
       )}
