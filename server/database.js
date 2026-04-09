@@ -392,24 +392,32 @@ module.exports = {
   // ========== ASSETS (company-scoped) ==========
   getAssets: (companyId) => {
     const cData = loadCompanyData(companyId);
-    return cData.assets.map(a => ({
-      ...a,
-      location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
-      photos: cData.photos.filter(p => p.asset_id === a.id),
-      notes: cData.notes.filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    }));
+    return cData.assets.map(a => {
+      const photos = cData.photos.filter(p => p.asset_id === a.id);
+      return {
+        ...a,
+        location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
+        photos: photos.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+        thumbnail: photos.length > 0 ? photos[0].url : null,
+        notes: cData.notes.filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      };
+    });
   },
   getAllAssets: () => {
     let allAssets = [];
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
-      allAssets = allAssets.concat(cData.assets.map(a => ({
-        ...a,
-        company_name: company.name,
-        location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
-        photos: cData.photos.filter(p => p.asset_id === a.id),
-        notes: cData.notes.filter(n => n.asset_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))
-      })));
+      allAssets = allAssets.concat(cData.assets.map(a => {
+        const photos = cData.photos.filter(p => p.asset_id === a.id);
+        return {
+          ...a,
+          company_name: company.name,
+          location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
+          photos: photos.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+          thumbnail: photos.length > 0 ? photos[0].url : null,
+          notes: cData.notes.filter(n => n.asset_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))
+        };
+      }));
     }
     return allAssets;
   },
@@ -559,6 +567,15 @@ module.exports = {
   },
 
   // ========== PHOTOS ==========
+  getPhotos: (assetId) => {
+    for (const company of platform.companies) {
+      const cData = loadCompanyData(company.id);
+      const photos = cData.photos.filter(p => p.asset_id === assetId);
+      if (photos.length > 0 || cData.assets.find(a => a.id === assetId)) return photos;
+    }
+    return [];
+  },
+
   addPhoto: (assetId, url, name) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
