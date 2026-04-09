@@ -869,7 +869,7 @@ const AssetManager = ({ user, onLogout }) => {
   
   const handleBulkTransfer = async () => { if(!bulkTransferTo) return; try { await api('/assets/bulk-transfer',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,locationId:parseInt(bulkTransferTo)})}); setShowBulkTransfer(false); setSelectedAssets([]); setBulkTransferTo(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleBulkCategory = async () => { if(!bulkCategoryTo) return; try { await api('/assets/bulk-category',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,category:bulkCategoryTo})}); setShowBulkCategory(false); setSelectedAssets([]); setBulkCategoryTo(''); loadAllData(); } catch(e){ alert(e.message); } };
-  const handleBulkDelete = async () => { try { await api('/assets/bulk-delete',{method:'POST',body:JSON.stringify({assetIds:selectedAssets})}); setShowBulkDelete(false); setSelectedAssets([]); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleBulkDelete = async () => { setLoadingAction('Deleting '+selectedAssets.length+' assets...'); try { await api('/assets/bulk-delete',{method:'POST',body:JSON.stringify({assetIds:selectedAssets})}); setShowBulkDelete(false); setSelectedAssets([]); await loadAllData(); } catch(e){ alert(e.message); } setLoadingAction(''); };
   const handleBulkDuplicate = async () => {
     if(!bulkDuplicateTo) return;
     try {
