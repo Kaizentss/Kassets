@@ -464,6 +464,26 @@ module.exports = {
     }
   },
 
+  bulkDeleteAssets: (ids) => {
+    const affectedCompanies = new Set();
+    for (const id of ids) {
+      for (const company of platform.companies) {
+        const cData = loadCompanyData(company.id);
+        const idx = cData.assets.findIndex(a => a.id === id);
+        if (idx !== -1) {
+          cData.assets = cData.assets.filter(a => a.id !== id);
+          cData.photos = cData.photos.filter(p => p.asset_id !== id);
+          cData.notes = cData.notes.filter(n => n.asset_id !== id);
+          affectedCompanies.add(company.id);
+          break;
+        }
+      }
+    }
+    for (const companyId of affectedCompanies) {
+      saveCompanyData(companyId);
+    }
+  },
+
   // ========== LOCATIONS (company-scoped) ==========
   getLocations: (companyId) => {
     const cData = loadCompanyData(companyId);
