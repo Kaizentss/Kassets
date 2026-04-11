@@ -562,11 +562,13 @@ module.exports = (db) => {
       const { assetIds } = req.body;
       const companyId = getCompanyId(req);
       const who = req.user.displayName || req.user.username;
+      // Log audit entries first (before deletion)
       assetIds.forEach(id => {
         const asset = db.getAsset(id);
-        db.deleteAsset(id);
         if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, who);
       });
+      // Bulk delete with single save
+      db.bulkDeleteAssets(assetIds);
       res.json({ message: `${assetIds.length} assets deleted` });
     } catch (e) {
       res.status(500).json({ error: e.message });
