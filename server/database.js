@@ -222,6 +222,9 @@ try {
 // ==================== DATABASE INTERFACE ====================
 
 module.exports = {
+  // ========== UTILITY ==========
+  saveCompany: (companyId) => saveCompanyData(companyId),
+
   // ========== COMPANIES ==========
   getCompanies: () => platform.companies,
   getCompany: (id) => platform.companies.find(c => c.id === id),
@@ -438,14 +441,13 @@ module.exports = {
     saveCompanyData(companyId);
     return newAsset;
   },
-  updateAsset: (id, data) => {
-    // Find which company owns this asset
+  updateAsset: (id, data, skipSave) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
       const idx = cData.assets.findIndex(a => a.id === id);
       if (idx !== -1) {
         cData.assets[idx] = { ...cData.assets[idx], ...data };
-        saveCompanyData(company.id);
+        if (!skipSave) saveCompanyData(company.id);
         return;
       }
     }
@@ -621,13 +623,13 @@ module.exports = {
   },
 
   // ========== NOTES ==========
-  addNote: (assetId, text, createdBy) => {
+  addNote: (assetId, text, createdBy, skipSave) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
       if (cData.assets.find(a => a.id === assetId)) {
         const note = { id: nextGlobalId('notes'), asset_id: assetId, text, created_by: createdBy, created_at: new Date().toISOString() };
         cData.notes.push(note);
-        saveCompanyData(company.id);
+        if (!skipSave) saveCompanyData(company.id);
         return note;
       }
     }
