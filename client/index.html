@@ -86,7 +86,6 @@
       th { background: #f0f0f0 !important; }
       tr:last-child { background: #e0e0e0 !important; font-weight: bold !important; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
     @page { margin: 0.5in; size: landscape; }
     }
   </style>
@@ -887,11 +886,11 @@ const AssetManager = ({ user, onLogout }) => {
     } catch(e){ setBulkDupProgress({ active:false, current:0, total:0, currentName:'' }); alert(e.message); }
   };
 
-  const handleAddLocation = async () => { if(!newLocation.name) return; try { await api('/locations',{method:'POST',body:JSON.stringify(newLocation)}); setShowAddLocation(false); setNewLocation({name:'',address:''}); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleAddLocation = async () => { if(!newLocation.name || loadingAction) return; setLoadingAction('Adding location...'); try { await api('/locations',{method:'POST',body:JSON.stringify(newLocation)}); setShowAddLocation(false); setNewLocation({name:'',address:''}); await loadAllData(); } catch(e){ alert(e.message); } setLoadingAction(''); };
   const handleUpdateLocation = async () => { try { await api('/locations/'+editingLocation.id,{method:'PUT',body:JSON.stringify(editingLocation)}); setEditingLocation(null); loadAllData(); } catch(e){ alert(e.message); } };
   const handleDeleteLocation = async (id) => { const loc = locations.find(l=>l.id===id); if(!confirm(`⚠️ CAUTION: Delete location "${loc?.name || ''}"?\n\nThis action cannot be undone.`)) return; try { await api('/locations/'+id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } };
 
-  const handleAddCategory = async () => { if(!newCategory.trim()||categories.includes(newCategory.trim())) return; try { await api('/categories',{method:'POST',body:JSON.stringify({name:newCategory.trim()})}); setNewCategory(''); loadAllData(); } catch(e){ alert(e.message); } };
+  const handleAddCategory = async () => { if(!newCategory.trim()||categories.includes(newCategory.trim())||loadingAction) return; setLoadingAction('Adding category...'); try { await api('/categories',{method:'POST',body:JSON.stringify({name:newCategory.trim()})}); setNewCategory(''); await loadAllData(); } catch(e){ alert(e.message); } setLoadingAction(''); };
   const handleRenameCategory = async () => { if(!editingCategoryName.trim()||editingCategoryName===editingCategory){setEditingCategory(null);return;} try { await api('/categories/rename',{method:'POST',body:JSON.stringify({oldName:editingCategory,newName:editingCategoryName.trim()})}); setEditingCategory(null); setEditingCategoryName(''); loadAllData(); } catch(e){ alert(e.message); } };
   const handleDeleteCategory = async (n) => { if(!confirm(`⚠️ CAUTION: Delete category "${n}"?\n\nThis action cannot be undone.`)) return; const c=await api('/categories'); const f=c.find(x=>x.name===n); if(f){ try { await api('/categories/'+f.id,{method:'DELETE'}); loadAllData(); } catch(e){ alert(e.message); } } };
 
@@ -1787,9 +1786,8 @@ const AssetManager = ({ user, onLogout }) => {
       {loadingAction && (
         <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
           <div style={{ background:'rgba(30,41,59,0.95)', borderRadius:16, padding:'24px 40px', textAlign:'center', border:'1px solid rgba(148,163,184,0.2)' }}>
-            <div style={{ width:44, height:44, border:'3px solid rgba(148,163,184,0.3)', borderTopColor:'#3b82f6', borderRightColor:'#8b5cf6', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto 14px' }} />
-            <p style={{ color:'#e2e8f0', fontSize:14, animation:'pulse 1.5s ease-in-out infinite' }}>{loadingAction}</p>
-            <p style={{ color:'#64748b', fontSize:11, marginTop:6 }}>Please wait...</p>
+            <div style={{ width:40, height:40, border:'3px solid rgba(148,163,184,0.3)', borderTopColor:'#3b82f6', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }} />
+            <p style={{ color:'#e2e8f0', fontSize:14 }}>{loadingAction}</p>
           </div>
         </div>
       )}
