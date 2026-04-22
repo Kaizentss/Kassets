@@ -59,6 +59,41 @@ function getCompanyFilePath(slug) {
   return path.join(COMPANIES_DIR, `${slug}.json`);
 }
 
+function getPhotoStorePath(slug) {
+  return path.join(COMPANIES_DIR, `${slug}-photos-store`);
+}
+
+function getCompanySlug(companyId) {
+  const cached = companyCache[companyId];
+  if (cached) return cached.slug;
+  const company = platform.companies.find(c => c.id === companyId);
+  return company ? (company.slug || slugify(company.name)) : null;
+}
+
+function readPhotoFile(slug, photoId) {
+  try {
+    const dir = getPhotoStorePath(slug);
+    const filePath = path.join(dir, `${photoId}.json`);
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+  } catch(e) {}
+  return null;
+}
+
+function writePhotoFile(slug, photo) {
+  const dir = getPhotoStorePath(slug);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${photo.id}.json`), JSON.stringify(photo));
+}
+
+function deletePhotoFile(slug, photoId) {
+  try {
+    const filePath = path.join(getPhotoStorePath(slug), `${photoId}.json`);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch(e) {}
+}
+
 function loadCompanyData(companyId) {
   // Return from cache if available
   if (companyCache[companyId]) return companyCache[companyId].data;
@@ -395,13 +430,19 @@ module.exports = {
   // ========== ASSETS (company-scoped) ==========
   getAssets: (companyId) => {
     const cData = loadCompanyData(companyId);
+    const slug = getCompanySlug(companyId);
     return cData.assets.map(a => {
-      const photos = cData.photos.filter(p => p.asset_id === a.id);
+      const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
+      let thumbnail = null;
+      if (photoMetas.length > 0 && slug) {
+        const firstPhoto = readPhotoFile(slug, photoMetas[0].id);
+        if (firstPhoto) thumbnail = firstPhoto.url;
+      }
       return {
         ...a,
         location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
-        photos: photos.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
-        thumbnail: photos.length > 0 ? photos[0].url : null,
+        photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+        thumbnail,
         notes: cData.notes.filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       };
     });
@@ -410,14 +451,20 @@ module.exports = {
     let allAssets = [];
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
+      const slug = getCompanySlug(company.id);
       allAssets = allAssets.concat(cData.assets.map(a => {
-        const photos = cData.photos.filter(p => p.asset_id === a.id);
+        const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
+        let thumbnail = null;
+        if (photoMetas.length > 0 && slug) {
+          const firstPhoto = readPhotoFile(slug, photoMetas[0].id);
+          if (firstPhoto) thumbnail = firstPhoto.url;
+        }
         return {
           ...a,
           company_name: company.name,
           location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
-          photos: photos.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
-          thumbnail: photos.length > 0 ? photos[0].url : null,
+          photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+          thumbnail,
           notes: cData.notes.filter(n => n.asset_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))
         };
       }));
@@ -457,9 +504,12 @@ module.exports = {
       const cData = loadCompanyData(company.id);
       const idx = cData.assets.findIndex(a => a.id === id);
       if (idx !== -1) {
+        const slug = getCompanySlug(company.id);
+        const photoIds = cData.photos.filter(p => p.asset_id === id).map(p => p.id);
         cData.assets = cData.assets.filter(a => a.id !== id);
         cData.photos = cData.photos.filter(p => p.asset_id !== id);
         cData.notes = cData.notes.filter(n => n.asset_id !== id);
+        if (slug) photoIds.forEach(pid => deletePhotoFile(slug, pid));
         saveCompanyData(company.id);
         return;
       }
@@ -473,9 +523,12 @@ module.exports = {
         const cData = loadCompanyData(company.id);
         const idx = cData.assets.findIndex(a => a.id === id);
         if (idx !== -1) {
+          const slug = getCompanySlug(company.id);
+          const photoIds = cData.photos.filter(p => p.asset_id === id).map(p => p.id);
           cData.assets = cData.assets.filter(a => a.id !== id);
           cData.photos = cData.photos.filter(p => p.asset_id !== id);
           cData.notes = cData.notes.filter(n => n.asset_id !== id);
+          if (slug) photoIds.forEach(pid => deletePhotoFile(slug, pid));
           affectedCompanies.add(company.id);
           break;
         }
@@ -592,8 +645,14 @@ module.exports = {
   getPhotos: (assetId) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
-      const photos = cData.photos.filter(p => p.asset_id === assetId);
-      if (photos.length > 0 || cData.assets.find(a => a.id === assetId)) return photos;
+      const photoMetas = cData.photos.filter(p => p.asset_id === assetId);
+      if (photoMetas.length > 0 || cData.assets.find(a => a.id === assetId)) {
+        const slug = getCompanySlug(company.id);
+        return photoMetas.map(pm => {
+          const full = slug ? readPhotoFile(slug, pm.id) : null;
+          return full || pm;
+        });
+      }
     }
     return [];
   },
@@ -603,7 +662,11 @@ module.exports = {
       const cData = loadCompanyData(company.id);
       if (cData.assets.find(a => a.id === assetId)) {
         const photo = { id: nextGlobalId('photos'), asset_id: assetId, url, name, created_at: new Date().toISOString() };
-        cData.photos.push(photo);
+        const slug = getCompanySlug(company.id);
+        // Save full photo to individual file
+        if (slug) writePhotoFile(slug, photo);
+        // Only store metadata in main JSON
+        cData.photos.push({ id: photo.id, asset_id: photo.asset_id, name: photo.name });
         saveCompanyData(company.id);
         return photo;
       }
@@ -616,6 +679,8 @@ module.exports = {
       const photo = cData.photos.find(p => p.id === id);
       if (photo) {
         cData.photos = cData.photos.filter(p => p.id !== id);
+        const slug = getCompanySlug(company.id);
+        if (slug) deletePhotoFile(slug, id);
         saveCompanyData(company.id);
         return;
       }
