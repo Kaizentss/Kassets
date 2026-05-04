@@ -72,8 +72,30 @@
     .chart-bar:hover { opacity: 0.8; transform: scaleY(1.05); }
     .theme-toggle { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s ease; font-size: 18px; }
     .theme-toggle:hover { background: var(--bg-tertiary); transform: rotate(15deg); }
-    @media (max-width: 768px) { .hide-mobile { display: none !important; } .modal-content { padding: 20px; margin: 10px; max-height: 90vh; } header { padding: 12px 16px !important; } main { padding: 16px !important; } }
-    @media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr !important; } }
+    @media (max-width: 768px) {
+      .hide-mobile { display: none !important; }
+      .modal-content { padding: 20px; margin: 10px; max-height: 90vh; }
+      header { padding: 12px 16px !important; }
+      main { padding: 12px !important; }
+      .asset-row { padding: 12px !important; margin-bottom: 8px !important; }
+      .asset-row .asset-actions { width: 100%; justify-content: flex-start !important; margin-top: 8px; }
+      .asset-row .asset-info { min-width: 0 !important; }
+      .asset-row .asset-badges { gap: 4px !important; }
+      .filter-bar { gap: 8px !important; }
+      .filter-bar .input-field { max-width: none !important; flex: 1; min-width: 0; }
+      .filter-bar select.input-field { font-size: 13px; }
+      .bulk-bar { gap: 8px !important; padding: 12px !important; }
+      .bulk-bar button { padding: 8px 12px !important; font-size: 12px !important; flex: 1; }
+      .header-buttons { gap: 4px !important; }
+      .header-buttons button { padding: 6px 10px !important; font-size: 11px !important; }
+      .category-badge, .location-badge { font-size: 10px !important; padding: 3px 8px !important; }
+    }
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: 1fr !important; }
+      .filter-bar { flex-direction: column !important; }
+      .filter-bar .input-field, .filter-bar select.input-field, .filter-bar button { width: 100% !important; max-width: none !important; }
+      .asset-row .asset-meta { flex-direction: column !important; align-items: flex-start !important; }
+    }
     @media print {
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       body { background: white !important; color: black !important; font-size: 12pt; }
@@ -1217,7 +1239,7 @@ const AssetManager = ({ user, onLogout }) => {
             <p style={{ margin:0, fontSize:11, color:'var(--text-muted)' }}>Asset Management</p>
           </div>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }} className="header-buttons">
           <span style={{ color:'var(--text-muted)', fontSize:13 }} className="hide-mobile">👤 {user.displayName || user.username}</span>
           <span className={`category-badge ${roleColors[user.role]}`}>{roleLabels[user.role]}</span>
           <button className="theme-toggle" onClick={toggleTheme} title={theme==='dark'?'Light mode':'Dark mode'}>{theme==='dark'?'☀️':'🌙'}</button>
@@ -1286,7 +1308,7 @@ const AssetManager = ({ user, onLogout }) => {
         {/* Assets */}
         {activeTab === 'assets' && (
           <div>
-            <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+            <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap', alignItems:'center' }} className="filter-bar">
               <input type="text" className="input-field" placeholder="Search assets..." style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               <select className="input-field" style={{ maxWidth:180 }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setSelectedAssets([]); }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
               <select className="input-field" style={{ maxWidth:180 }} value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setSelectedAssets([]); }}><option value="all">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
@@ -1294,8 +1316,13 @@ const AssetManager = ({ user, onLogout }) => {
               {canEditData && filteredAssets.length>0 && <button className="btn-secondary" style={{ padding:'10px 16px' }} onClick={selectAll}>{selectedAssets.length===filteredAssets.length?'☑ Deselect All':'☐ Select All'}</button>}
             </div>
             
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'0 4px' }}>
+              <span style={{ fontSize:12, color:'#64748b' }}>{filteredAssets.length} asset{filteredAssets.length!==1?'s':''}{filteredAssets.length!==assets.length?` (of ${assets.length})`:''}</span>
+              {isAdminRole && <span style={{ fontSize:12, color:'#34d399', fontFamily:"'JetBrains Mono', monospace" }}>Total: {formatCurrency(filteredAssets.reduce((s,a)=>s+a.currentValue*a.quantity,0))}</span>}
+            </div>
+            
             {canEditData && selectedAssets.length>0 && (
-              <div style={{ display:'flex', gap:12, padding:16, marginBottom:16, background:'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(30,41,59,0.9))', borderRadius:12, alignItems:'center', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:12, padding:16, marginBottom:16, background:'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(30,41,59,0.9))', borderRadius:12, alignItems:'center', flexWrap:'wrap' }} className="bulk-bar">
                 <span style={{ fontWeight:600 }}>{selectedAssets.length} selected</span>
                 <button className="btn-secondary" style={{ padding:'8px 16px' }} onClick={() => setShowBulkDuplicate(true)}>📋 Duplicate</button>
                 <button className="btn-primary" style={{ padding:'8px 16px' }} onClick={() => setShowBulkTransfer(true)}>📍 Move</button>
@@ -1308,24 +1335,24 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ maxHeight:'calc(100vh - 320px)', overflowY:'auto' }}>
               {filteredAssets.length===0 ? <div className="glass-card" style={{ padding:40, textAlign:'center' }}><p style={{ color:'#64748b' }}>No assets found</p></div> : filteredAssets.map(asset => (
                 <div key={asset.id} className={`asset-row ${selectedAssets.includes(asset.id)?'selected':''}`}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12, flex:1, minWidth:200 }}>
-                      {canEditData && <div onClick={() => toggleSelect(asset.id)} style={{ width:22, height:22, borderRadius:6, border:selectedAssets.includes(asset.id)?'2px solid #3b82f6':'2px solid #475569', background:selectedAssets.includes(asset.id)?'#3b82f6':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{selectedAssets.includes(asset.id) && <span style={{ color:'white', fontSize:12 }}>✓</span>}</div>}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12, flex:1, minWidth:200 }} className="asset-info">
+                      {canEditData && <div onClick={() => toggleSelect(asset.id)} style={{ width:28, height:28, borderRadius:6, border:selectedAssets.includes(asset.id)?'2px solid #3b82f6':'2px solid #475569', background:selectedAssets.includes(asset.id)?'#3b82f6':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{selectedAssets.includes(asset.id) && <span style={{ color:'white', fontSize:14 }}>✓</span>}</div>}
                       {asset.thumbnail ? <img src={asset.thumbnail} onClick={() => loadAndShowPhotos(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
-                      <div>
-                        <h4 style={{ margin:0, fontSize:15 }}>{asset.name}</h4>
-                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: renderFormattedDesc(asset.description) }} /></span>}</p>
+                      <div style={{ minWidth:0 }}>
+                        <h4 style={{ margin:0, fontSize:15, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{asset.name}</h4>
+                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: renderFormattedDesc(asset.description) }} /></span>}</p>
                       </div>
                     </div>
-                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }} className="asset-badges asset-actions">
                       <span className="category-badge">{asset.category}</span>
                       <span className="location-badge">{getLocationName(asset.locationId)}</span>
-                      {isAdminRole && <span style={{ fontFamily:"'JetBrains Mono', monospace", color:'#34d399', minWidth:80, textAlign:'right', fontSize:13 }}>{formatCurrency(asset.currentValue*asset.quantity)}</span>}
-                      {asset.photos?.length>1 && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadAndShowPhotos(asset)}>+{asset.photos.length-1} more</button>}
-                      <button title="Notes" className="btn-secondary" style={{ padding:'5px 10px', fontSize:11, background:asset.notes?.length?'rgba(251,191,36,0.2)':undefined }} onClick={() => setShowNotesModal(asset)}>📝 {asset.notes?.length||''}</button>
+                      {isAdminRole && <span style={{ fontFamily:"'JetBrains Mono', monospace", color:'#34d399', minWidth:70, textAlign:'right', fontSize:13 }}>{formatCurrency(asset.currentValue*asset.quantity)}</span>}
+                      {asset.photos?.length>1 && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadAndShowPhotos(asset)}>+{asset.photos.length-1}</button>}
+                      <button title="Notes" className="btn-secondary" style={{ padding:'5px 10px', fontSize:11, background:asset.notes?.length?'rgba(251,191,36,0.2)':undefined }} onClick={() => setShowNotesModal(asset)}>📝{asset.notes?.length?' '+asset.notes.length:''}</button>
                       {canEditData && <button title="Copy" className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDuplicate(asset)}>📋</button>}
-                      {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadPhotosForEdit(asset)}>Edit</button>}
-                      {isAdminRole && <button className="btn-danger" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDeleteAsset(asset.id)}>Delete</button>}
+                      {canEditData && <button className="btn-secondary" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => loadPhotosForEdit(asset)}>✏️</button>}
+                      {isAdminRole && <button className="btn-danger" style={{ padding:'5px 10px', fontSize:11 }} onClick={() => handleDeleteAsset(asset.id)}>🗑️</button>}
                     </div>
                   </div>
                 </div>
