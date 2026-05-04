@@ -84,6 +84,29 @@ function savePlatform() {
 
 let platform = loadPlatform();
 
+// ==================== THUMBNAIL CACHE ====================
+const thumbnailCache = {};
+
+function getThumbnail(slug, photoId) {
+  const key = `${slug}:${photoId}`;
+  if (thumbnailCache[key] !== undefined) return thumbnailCache[key];
+  const photo = readPhotoFile(slug, photoId);
+  const url = photo ? photo.url : null;
+  thumbnailCache[key] = url;
+  return url;
+}
+
+function invalidateThumbnail(slug, photoId) {
+  delete thumbnailCache[`${slug}:${photoId}`];
+}
+
+function invalidateAssetThumbnails(slug, assetId, cData) {
+  const photoMetas = cData.photos.filter(p => p.asset_id === assetId);
+  for (const pm of photoMetas) {
+    delete thumbnailCache[`${slug}:${pm.id}`];
+  }
+}
+
 // ==================== COMPANY DATA (per-company JSON files) ====================
 const defaultCompanyData = {
   assets: [],
@@ -326,6 +349,29 @@ try {
 
 // ==================== DATABASE INTERFACE ====================
 
+// Preload thumbnail cache on startup
+function preloadThumbnails() {
+  let count = 0;
+  for (const company of platform.companies) {
+    const cData = loadCompanyData(company.id);
+    const slug = getCompanySlug(company.id);
+    if (!slug) continue;
+    // Group photos by asset, only cache first photo per asset
+    const assetFirstPhoto = {};
+    for (const p of cData.photos) {
+      if (!assetFirstPhoto[p.asset_id]) assetFirstPhoto[p.asset_id] = p.id;
+    }
+    for (const photoId of Object.values(assetFirstPhoto)) {
+      getThumbnail(slug, photoId);
+      count++;
+    }
+  }
+  console.log(`📷 Preloaded ${count} thumbnails into cache`);
+}
+
+// Run preload after a short delay so server starts accepting requests immediately
+setTimeout(preloadThumbnails, 2000);
+
 module.exports = {
   // ========== UTILITY ==========
   saveCompany: (companyId) => saveCompanyData(companyId),
@@ -505,8 +551,7 @@ module.exports = {
       const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
       let thumbnail = null;
       if (photoMetas.length > 0 && slug) {
-        const firstPhoto = readPhotoFile(slug, photoMetas[0].id);
-        if (firstPhoto) thumbnail = firstPhoto.url;
+        thumbnail = getThumbnail(slug, photoMetas[0].id);
       }
       return {
         ...a,
@@ -526,8 +571,7 @@ module.exports = {
         const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
         let thumbnail = null;
         if (photoMetas.length > 0 && slug) {
-          const firstPhoto = readPhotoFile(slug, photoMetas[0].id);
-          if (firstPhoto) thumbnail = firstPhoto.url;
+          thumbnail = getThumbnail(slug, photoMetas[0].id);
         }
         return {
           ...a,
@@ -733,9 +777,14 @@ module.exports = {
       if (cData.assets.find(a => a.id === assetId)) {
         const photo = { id: nextGlobalId('photos'), asset_id: assetId, url, name, created_at: new Date().toISOString() };
         const slug = getCompanySlug(company.id);
-        // Save full photo to individual file
-        if (slug) writePhotoFile(slug, photo);
-        // Only store metadata in main JSON
+        if (slug) {
+          writePhotoFile(slug, photo);
+          // If this is the first photo, cache it as thumbnail
+          const existingPhotos = cData.photos.filter(p => p.asset_id === assetId);
+          if (existingPhotos.length === 0) {
+            thumbnailCache[`${slug}:${photo.id}`] = url;
+          }
+        }
         cData.photos.push({ id: photo.id, asset_id: photo.asset_id, name: photo.name });
         saveCompanyData(company.id);
         return photo;
@@ -750,7 +799,10 @@ module.exports = {
       if (photo) {
         cData.photos = cData.photos.filter(p => p.id !== id);
         const slug = getCompanySlug(company.id);
-        if (slug) deletePhotoFile(slug, id);
+        if (slug) {
+          deletePhotoFile(slug, id);
+          invalidateThumbnail(slug, id);
+        }
         saveCompanyData(company.id);
         return;
       }
