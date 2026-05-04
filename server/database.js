@@ -24,19 +24,62 @@ const defaultPlatform = {
 };
 
 function loadPlatform() {
-  try {
-    if (fs.existsSync(PLATFORM_PATH)) {
-      const data = JSON.parse(fs.readFileSync(PLATFORM_PATH, 'utf8'));
-      return { ...defaultPlatform, ...data };
-    }
-  } catch (e) {
-    console.log('Creating new platform database...');
-  }
+  const data = safeLoadJSON(PLATFORM_PATH, null);
+  if (data) return { ...defaultPlatform, ...data };
   return { ...defaultPlatform };
 }
 
+// ==================== ATOMIC FILE WRITE ====================
+function atomicWrite(filePath, data) {
+  const tmpPath = filePath + '.tmp';
+  const bakPath = filePath + '.bak';
+  try {
+    const jsonStr = JSON.stringify(data, null, 2);
+    // Write to temp file first
+    fs.writeFileSync(tmpPath, jsonStr);
+    // Backup existing file
+    if (fs.existsSync(filePath)) {
+      try { fs.copyFileSync(filePath, bakPath); } catch(e) {}
+    }
+    // Atomic rename
+    fs.renameSync(tmpPath, filePath);
+  } catch(e) {
+    console.error(`❌ Failed to write ${filePath}:`, e.message);
+    // Clean up temp file
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch(e2) {}
+    throw e;
+  }
+}
+
+function safeLoadJSON(filePath, fallback) {
+  try {
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+  } catch(e) {
+    console.error(`⚠️ Corrupt file ${filePath}, trying backup...`);
+    const bakPath = filePath + '.bak';
+    try {
+      if (fs.existsSync(bakPath)) {
+        const data = JSON.parse(fs.readFileSync(bakPath, 'utf8'));
+        // Restore from backup
+        fs.copyFileSync(bakPath, filePath);
+        console.log(`✅ Recovered from backup: ${filePath}`);
+        return data;
+      }
+    } catch(e2) {
+      console.error(`❌ Backup also corrupt for ${filePath}`);
+    }
+  }
+  return fallback;
+}
+
 function savePlatform() {
-  fs.writeFileSync(PLATFORM_PATH, JSON.stringify(platform, null, 2));
+  try {
+    atomicWrite(PLATFORM_PATH, platform);
+  } catch(e) {
+    console.error('❌ Failed to save platform:', e.message);
+  }
 }
 
 let platform = loadPlatform();
@@ -77,21 +120,30 @@ function readPhotoFile(slug, photoId) {
     if (fs.existsSync(filePath)) {
       return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error(`⚠️ Failed to read photo ${photoId}:`, e.message);
+  }
   return null;
 }
 
 function writePhotoFile(slug, photo) {
-  const dir = getPhotoStorePath(slug);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, `${photo.id}.json`), JSON.stringify(photo));
+  try {
+    const dir = getPhotoStorePath(slug);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const filePath = path.join(dir, `${photo.id}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(photo));
+  } catch(e) {
+    console.error(`❌ Failed to write photo ${photo.id}:`, e.message);
+  }
 }
 
 function deletePhotoFile(slug, photoId) {
   try {
     const filePath = path.join(getPhotoStorePath(slug), `${photoId}.json`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  } catch(e) {}
+  } catch(e) {
+    console.error(`⚠️ Failed to delete photo file ${photoId}:`, e.message);
+  }
 }
 
 function loadCompanyData(companyId) {
@@ -104,30 +156,48 @@ function loadCompanyData(companyId) {
   const slug = company.slug || slugify(company.name);
   const filePath = getCompanyFilePath(slug);
 
-  try {
-    if (fs.existsSync(filePath)) {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      companyCache[companyId] = { data: { ...defaultCompanyData, ...data }, slug };
-      return companyCache[companyId].data;
-    }
-  } catch (e) {
-    console.log(`Creating new database for company: ${company.name}`);
+  const data = safeLoadJSON(filePath, null);
+  if (data) {
+    companyCache[companyId] = { data: { ...defaultCompanyData, ...data }, slug };
+    return companyCache[companyId].data;
   }
 
-  const freshData = { ...defaultCompanyData, assets: [], locations: [], categories: [], settings: [], photos: [], notes: [] };
+  const freshData = { ...defaultCompanyData, assets: [], locations: [], categories: [], settings: [], photos: [], notes: [], audit_log: [] };
   companyCache[companyId] = { data: freshData, slug };
   return freshData;
 }
 
-function saveCompanyData(companyId) {
+// Debounce timers for company saves
+const saveTimers = {};
+const SAVE_DELAY = 500; // ms
+
+function saveCompanyData(companyId, immediate) {
   const company = platform.companies.find(c => c.id === companyId);
   if (!company) return;
 
   const slug = company.slug || slugify(company.name);
   const filePath = getCompanyFilePath(slug);
   const data = companyCache[companyId]?.data;
-  if (data) {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  if (!data) return;
+
+  const doSave = () => {
+    try {
+      atomicWrite(filePath, data);
+    } catch(e) {
+      console.error(`❌ Failed to save company ${company.name}:`, e.message);
+    }
+  };
+
+  if (immediate) {
+    if (saveTimers[companyId]) { clearTimeout(saveTimers[companyId]); delete saveTimers[companyId]; }
+    doSave();
+  } else {
+    // Debounce: if multiple saves happen within SAVE_DELAY, only the last one writes to disk
+    if (saveTimers[companyId]) clearTimeout(saveTimers[companyId]);
+    saveTimers[companyId] = setTimeout(() => {
+      doSave();
+      delete saveTimers[companyId];
+    }, SAVE_DELAY);
   }
 }
 
@@ -1031,3 +1101,22 @@ module.exports = {
     };
   }
 };
+
+// ==================== GRACEFUL SHUTDOWN ====================
+function flushAllSaves() {
+  for (const companyId of Object.keys(saveTimers)) {
+    clearTimeout(saveTimers[companyId]);
+    delete saveTimers[companyId];
+    const company = platform.companies.find(c => c.id === parseInt(companyId));
+    if (company) {
+      const slug = company.slug || slugify(company.name);
+      const filePath = getCompanyFilePath(slug);
+      const data = companyCache[companyId]?.data;
+      if (data) {
+        try { atomicWrite(filePath, data); console.log(`💾 Flushed save for ${company.name}`); } catch(e) { console.error(`❌ Failed to flush ${company.name}:`, e.message); }
+      }
+    }
+  }
+}
+process.on('SIGTERM', () => { console.log('🛑 SIGTERM received, flushing saves...'); flushAllSaves(); process.exit(0); });
+process.on('SIGINT', () => { console.log('🛑 SIGINT received, flushing saves...'); flushAllSaves(); process.exit(0); });
