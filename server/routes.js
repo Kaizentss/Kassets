@@ -562,13 +562,11 @@ module.exports = (db) => {
       const { assetIds } = req.body;
       const companyId = getCompanyId(req);
       const who = req.user.displayName || req.user.username;
-      // Log audit entries first (before deletion)
       assetIds.forEach(id => {
         const asset = db.getAsset(id);
+        db.deleteAsset(id);
         if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, who);
       });
-      // Bulk delete with single save
-      db.bulkDeleteAssets(assetIds);
       res.json({ message: `${assetIds.length} assets deleted` });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -576,15 +574,6 @@ module.exports = (db) => {
   });
 
   // ========== PHOTOS ==========
-  router.get('/assets/:id/photos', auth, (req, res) => {
-    try {
-      const photos = db.getPhotos(parseInt(req.params.id));
-      res.json(photos);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
   router.post('/assets/:id/photos', auth, canEdit, (req, res) => {
     try {
       const photo = db.addPhoto(parseInt(req.params.id), req.body.url, req.body.name);
@@ -762,6 +751,12 @@ module.exports = (db) => {
       console.error('Import error:', e.message);
       res.status(400).json({ error: e.message });
     }
+  });
+
+  // Global error handler - catch any unhandled route errors
+  router.use((err, req, res, next) => {
+    console.error('❌ Unhandled route error:', err.message);
+    res.status(500).json({ error: 'An internal error occurred. Please try again.' });
   });
 
   return router;
