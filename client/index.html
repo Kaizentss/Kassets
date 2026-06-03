@@ -107,6 +107,11 @@ const api = async (endpoint, options = {}) => {
   return data;
 };
 
+const thumbUrl = (photoId) => {
+  const token = localStorage.getItem('kassets_token');
+  return '/api/photos/' + photoId + '/thumb?token=' + encodeURIComponent(token || '');
+};
+
 const roleColors = { super_admin: 'role-super', master_admin: 'role-master', admin: 'role-admin', editor: 'role-editor', viewer: 'role-viewer' };
 const roleLabels = { super_admin: 'SUPER ADMIN', master_admin: 'MASTER ADMIN', admin: 'ADMIN', editor: 'EDITOR', viewer: 'VIEWER' };
 const formatCurrency = (amt) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amt || 0);
@@ -1328,7 +1333,7 @@ const AssetManager = ({ user, onLogout }) => {
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12, flex:1, minWidth:200 }}>
                       {canEditData && <div onClick={() => toggleSelect(asset.id)} style={{ width:22, height:22, borderRadius:6, border:selectedAssets.includes(asset.id)?'2px solid #3b82f6':'2px solid #475569', background:selectedAssets.includes(asset.id)?'#3b82f6':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{selectedAssets.includes(asset.id) && <span style={{ color:'white', fontSize:12 }}>✓</span>}</div>}
-                      {asset.thumbnailPhotoId ? <img src={'/api/photos/'+asset.thumbnailPhotoId+'/thumb'} loading="lazy" onClick={() => loadAndShowPhotos(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
+                      {asset.thumbnailPhotoId ? <img src={thumbUrl(asset.thumbnailPhotoId)} loading="lazy" onClick={() => loadAndShowPhotos(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
                       <div>
                         <h4 style={{ margin:0, fontSize:15 }}>{asset.name}</h4>
                         <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: asset.description.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>') }} /></span>}</p>
