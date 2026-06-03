@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kassets">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Multi-Company Asset Management">
   <title>Kassets — Multi-Company Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23ffd700' stroke='%23d4a000' stroke-width='4'/%3E%3Ctext x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='%23a07800' font-family='sans-serif'%3EK%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23ffd700' stroke='%23d4a000' stroke-width='4'/%3E%3Ctext x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='%23a07800' font-family='sans-serif'%3EK%3C/text%3E%3C/svg%3E" />
+  <link rel="manifest" href="/manifest.json">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -116,6 +123,13 @@ const thumbUrl = (photoId) => {
 const roleColors = { super_admin: 'role-super', master_admin: 'role-master', admin: 'role-admin', editor: 'role-editor', viewer: 'role-viewer' };
 const roleLabels = { super_admin: 'SUPER ADMIN', master_admin: 'MASTER ADMIN', admin: 'ADMIN', editor: 'EDITOR', viewer: 'VIEWER' };
 const formatCurrency = (amt) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amt || 0);
+const sanitizeForHTML = (text) => {
+  if (!text) return '';
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+};
+const renderFormattedDesc = (desc) => {
+  return sanitizeForHTML(desc).replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>');
+};
 
 const CoinLogo = ({ size = 56 }) => (
   <svg viewBox="0 0 400 400" width={size} height={size}>
@@ -783,7 +797,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [visibleCount, setVisibleCount] = useState(50);
 
   // Map server asset to frontend format
-  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:x.purchase_cost??x.purchaseCost??0, currentValue:x.current_value??x.currentValue??0, quantity:x.quantity??1, depreciationRate:x.depreciation_rate??x.depreciationRate??10, locationId:x.location_id??x.locationId??null, photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId||null, notes:x.notes||[] });
+  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:parseFloat(x.purchase_cost??x.purchaseCost)|| 0, currentValue:parseFloat(x.current_value??x.currentValue)||0, quantity:parseInt(x.quantity)>=0?parseInt(x.quantity):1, depreciationRate:parseFloat(x.depreciation_rate??x.depreciationRate)||10, locationId:x.location_id!=null?parseInt(x.location_id):(x.locationId!=null?parseInt(x.locationId):null), photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId??null, notes:x.notes||[] });
   const [newAsset, setNewAsset] = useState({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] });
   const [newLocation, setNewLocation] = useState({ name:'', address:'' });
   const [showChangePw, setShowChangePw] = useState(false);
@@ -795,11 +809,39 @@ const AssetManager = ({ user, onLogout }) => {
   const [bgColor2, setBgColor2] = useState(savedUserColors?.bgColor2 || '#1e293b');
   const [companyDefaultColors, setCompanyDefaultColors] = useState({ brandColor:'#ffd700', bgColor1:'#0f172a', bgColor2:'#1e293b' });
   const [compressPhotos, setCompressPhotos] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [sessionWarning, setSessionWarning] = useState(false);
 
   const canEditData = ['master_admin','admin','editor'].includes(user.role);
   const isAdminRole = ['master_admin','admin'].includes(user.role);
 
   useEffect(() => { loadAllData(); }, []);
+
+  // Offline detection
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => { window.removeEventListener('offline', goOffline); window.removeEventListener('online', goOnline); };
+  }, []);
+
+  // Session expiry warning — check JWT expiry every 60s
+  useEffect(() => {
+    const checkExpiry = () => {
+      try {
+        const token = localStorage.getItem('kassets_token');
+        if (!token) return;
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const expiresIn = (payload.exp * 1000) - Date.now();
+        if (expiresIn < 10 * 60 * 1000 && expiresIn > 0) setSessionWarning(true);
+        else if (expiresIn <= 0) { localStorage.removeItem('kassets_token'); window.location.reload(); }
+        else setSessionWarning(false);
+      } catch(e) {}
+    };
+    const timer = setInterval(checkExpiry, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadAllData = async () => {
     try {
@@ -820,16 +862,6 @@ const AssetManager = ({ user, onLogout }) => {
       }
       if (s.compress_photos !== undefined) setCompressPhotos(s.compress_photos !== false);
     } catch (e) { console.error('Load error:', e); }
-  };
-
-  // Refresh a single asset from server and update state
-  const refreshAsset = async (assetId) => {
-    try {
-      const raw = await api('/assets/' + assetId);
-      const updated = mapAsset(raw);
-      setAssets(prev => prev.map(a => a.id === assetId ? updated : a));
-      return updated;
-    } catch(e) { return null; }
   };
 
   const getLocationName = (id) => locations.find(l => l.id === id)?.name || 'Unknown';
@@ -894,8 +926,16 @@ const AssetManager = ({ user, onLogout }) => {
       await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId }) });
       const addedNotes = [];
       for (const n of notes) { const nn = await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); addedNotes.push(nn); }
-      // Update state directly with editing values
-      setAssets(prev => prev.map(a => a.id === editingAsset.id ? {...editingAsset, notes:[...addedNotes, ...(a.notes||[])]} : a));
+      // Update state directly with editing values (parse numbers to avoid string types)
+      const updatedAsset = {
+        ...editingAsset,
+        purchaseCost: parseFloat(editingAsset.purchaseCost) || 0,
+        currentValue: parseFloat(editingAsset.currentValue) || 0,
+        quantity: parseInt(editingAsset.quantity) >= 0 ? parseInt(editingAsset.quantity) : 1,
+        depreciationRate: parseFloat(editingAsset.depreciationRate) || 10,
+        locationId: editingAsset.locationId ? parseInt(editingAsset.locationId) : null,
+      };
+      setAssets(prev => prev.map(a => a.id === editingAsset.id ? {...updatedAsset, notes:[...addedNotes, ...(a.notes||[])]} : a));
       setEditingAsset(null);
     } catch (e) { alert(e.message); }
     setLoadingAction('');
@@ -982,7 +1022,7 @@ const AssetManager = ({ user, onLogout }) => {
         currentValue: a.currentValue, quantity: a.quantity, depreciationRate: a.depreciationRate,
         location: getLocationName(a.locationId),
         notes: (a.notes||[]).map(n => ({ text: n.text, createdBy: n.created_by, date: n.created_at })),
-        photos: (a.photos||[]).map(p => ({ name: p.name, url: p.url }))
+        photoCount: (a.photos||[]).length
       })),
       locations: locations.map(l => ({ name: l.name, address: l.address })),
       categories: categories,
@@ -1011,23 +1051,29 @@ const AssetManager = ({ user, onLogout }) => {
   };
 
   const handleExportCompressed = async () => {
-    const totalPhotos = assets.reduce((s, a) => s + (a.photos||[]).filter(p => p.url && p.url.startsWith('data:image')).length, 0);
-    setExportProgress({ current: 0, total: totalPhotos, status: 'Compressing photos...' });
+    const assetsWithPhotos = assets.filter(a => (a.photos||[]).length > 0);
+    const totalPhotos = assetsWithPhotos.reduce((s, a) => s + (a.photos||[]).length, 0);
+    setExportProgress({ current: 0, total: totalPhotos, status: 'Fetching photos from server...' });
 
     const compressedAssets = [];
     let photosDone = 0;
 
     for (const a of assets) {
       const compPhotos = [];
-      for (const p of (a.photos||[])) {
-        if (p.url && p.url.startsWith('data:image')) {
-          const compressed = await compressImage(p.url, 600, 0.4);
-          compPhotos.push({ name: p.name, url: compressed });
-          photosDone++;
-          setExportProgress({ current: photosDone, total: totalPhotos, status: `Compressing photo ${photosDone}/${totalPhotos}...` });
-        } else {
-          compPhotos.push({ name: p.name, url: p.url });
-        }
+      if ((a.photos||[]).length > 0) {
+        try {
+          const fullPhotos = await api('/assets/' + a.id + '/photos');
+          for (const p of fullPhotos) {
+            if (p.url && p.url.startsWith('data:image')) {
+              const compressed = await compressImage(p.url, 600, 0.4);
+              compPhotos.push({ name: p.name, url: compressed });
+            } else {
+              compPhotos.push({ name: p.name, url: p.url });
+            }
+            photosDone++;
+            setExportProgress({ current: photosDone, total: totalPhotos, status: `Compressing photo ${photosDone}/${totalPhotos}...` });
+          }
+        } catch(e) { /* skip photos for this asset */ }
       }
       compressedAssets.push({
         name: a.name, category: a.category, serialNumber: a.serialNumber, partNumber: a.partNumber,
@@ -1242,6 +1288,19 @@ const AssetManager = ({ user, onLogout }) => {
   
   return (
     <div style={{ minHeight:'100vh', background: dynamicBg }}>
+      {/* Offline Banner */}
+      {isOffline && (
+        <div style={{ background:'linear-gradient(90deg, #ef4444, #dc2626)', color:'white', padding:'10px 24px', textAlign:'center', fontSize:13, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span>⚠️ You're offline — changes won't save until connection is restored</span>
+        </div>
+      )}
+      {/* Session Expiry Warning */}
+      {sessionWarning && (
+        <div style={{ background:'linear-gradient(90deg, #f59e0b, #d97706)', color:'white', padding:'8px 24px', textAlign:'center', fontSize:13, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span>🔐 Your session expires soon — </span>
+          <button onClick={() => { window.location.reload(); }} style={{ background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.4)', color:'white', padding:'4px 12px', borderRadius:6, cursor:'pointer', fontSize:12, fontWeight:600 }}>Refresh to extend</button>
+        </div>
+      )}
       {/* Header */}
       <header style={{ padding:'16px 24px', borderBottom:'1px solid var(--border-color)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
@@ -1348,7 +1407,7 @@ const AssetManager = ({ user, onLogout }) => {
                       {asset.thumbnailPhotoId ? <img src={thumbUrl(asset.thumbnailPhotoId)} loading="lazy" onClick={() => loadAndShowPhotos(asset)} style={{ width:50, height:50, objectFit:'cover', borderRadius:8, cursor:'pointer', flexShrink:0, border:'2px solid rgba(148,163,184,0.2)' }} /> : <div style={{ width:50, height:50, borderRadius:8, background:'rgba(148,163,184,0.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><span style={{ fontSize:20, opacity:0.3 }}>📷</span></div>}
                       <div>
                         <h4 style={{ margin:0, fontSize:15 }}>{asset.name}</h4>
-                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: asset.description.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>') }} /></span>}</p>
+                        <p style={{ margin:'4px 0 0', fontSize:12, color:'#64748b' }}>{asset.partNumber&&`P/N: ${asset.partNumber} • `}{asset.serialNumber&&`SN: ${asset.serialNumber} • `}<span style={{ color: asset.quantity <= 0 ? '#ef4444' : '#fbbf24', fontWeight:700 }}>Qty: {asset.quantity}</span>{asset.description&&<span> • <span dangerouslySetInnerHTML={{ __html: renderFormattedDesc(asset.description) }} /></span>}</p>
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
