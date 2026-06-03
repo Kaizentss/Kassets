@@ -5,44 +5,6 @@ const path = require('path');
 const { auth, isSuperAdmin, isMasterAdmin, isAdmin, canEdit, sameCompany } = require('./middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'kassets-secret-key';
-if (JWT_SECRET === 'kassets-secret-key') console.warn('⚠️ Using default JWT secret! Set JWT_SECRET environment variable for production.');
-
-// ========== RATE LIMITING ==========
-const loginAttempts = {};
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-const MAX_ATTEMPTS = 10;
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  if (!loginAttempts[ip]) loginAttempts[ip] = [];
-  // Remove old attempts
-  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
-  if (loginAttempts[ip].length >= MAX_ATTEMPTS) return false;
-  loginAttempts[ip].push(now);
-  return true;
-}
-
-// Clean up rate limit data periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const ip of Object.keys(loginAttempts)) {
-    loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
-    if (loginAttempts[ip].length === 0) delete loginAttempts[ip];
-  }
-}, 5 * 60 * 1000);
-
-// ========== INPUT HELPERS ==========
-function sanitizeStr(val, maxLen = 500) {
-  if (typeof val !== 'string') return '';
-  return val.trim().slice(0, maxLen);
-}
-
-function sanitizeNum(val, fallback = 0) {
-  const n = parseFloat(val);
-  return isNaN(n) ? fallback : n;
-}
-
-const MIN_PASSWORD_LENGTH = 6;
 
 module.exports = (db) => {
   const router = express.Router();
@@ -59,13 +21,8 @@ module.exports = (db) => {
   // ========== AUTH ==========
   router.post('/auth/login', (req, res) => {
     try {
-      const ip = req.ip || req.connection.remoteAddress || 'unknown';
-      if (!checkRateLimit(ip)) {
-        return res.status(429).json({ error: 'Too many login attempts. Please try again in 15 minutes.' });
-      }
       const { username, password } = req.body;
-      if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-      const user = db.getUser(sanitizeStr(username, 100));
+      const user = db.getUser(username);
       if (!user || !bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
@@ -124,9 +81,6 @@ module.exports = (db) => {
   router.post('/auth/change-password', auth, (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
-        return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-      }
       const user = db.getUserById(req.user.id);
       if (!user || !bcrypt.compareSync(currentPassword, user.password)) {
         return res.status(400).json({ error: 'Wrong current password' });
@@ -259,9 +213,6 @@ module.exports = (db) => {
 
       const { username, password, displayName, email, role } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-      if (password.length < MIN_PASSWORD_LENGTH) return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-      const cleanUsername = sanitizeStr(username, 50).toLowerCase().replace(/[^a-z0-9._-]/g, '');
-      if (cleanUsername.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters (letters, numbers, ._-)' });
 
       // Validate role hierarchy
       const allowedRoles = { master_admin: ['admin', 'editor', 'viewer'], admin: ['editor', 'viewer'] };
@@ -281,10 +232,10 @@ module.exports = (db) => {
       }
 
       const user = db.createUser({
-        username: cleanUsername,
+        username,
         password: bcrypt.hashSync(password, 10),
-        display_name: sanitizeStr(displayName || username, 100),
-        email: sanitizeStr(email || '', 200),
+        display_name: displayName || username,
+        email: email || '',
         role: role || 'viewer',
         company_id: companyId,
         is_active: 1
@@ -521,22 +472,23 @@ module.exports = (db) => {
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
       const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
-      if (!name || !sanitizeStr(name).length) return res.status(400).json({ error: 'Asset name required' });
       const asset = db.createAsset({
         company_id: companyId,
-        name: sanitizeStr(name, 200),
-        category: sanitizeStr(category || 'Other', 100),
-        serial_number: sanitizeStr(serialNumber || '', 100),
-        part_number: sanitizeStr(partNumber || '', 100),
-        description: sanitizeStr(description || '', 2000),
-        purchase_date: sanitizeStr(purchaseDate || '', 20),
-        purchase_cost: sanitizeNum(purchaseCost),
-        current_value: sanitizeNum(currentValue) || sanitizeNum(purchaseCost),
+        name,
+        category: category || 'Other',
+        serial_number: serialNumber || '',
+        part_number: partNumber || '',
+        description: description || '',
+        purchase_date: purchaseDate || '',
+        purchase_cost: parseFloat(purchaseCost) || 0,
+        current_value: parseFloat(currentValue) || parseFloat(purchaseCost) || 0,
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
-        depreciation_rate: sanitizeNum(depreciationRate, 10),
+        depreciation_rate: parseFloat(depreciationRate) || 10,
         location_id: locationId ? parseInt(locationId) : null
       });
-      res.json({ id: asset.id });
+      // Return full asset data for optimistic updates
+      const full = db.getAsset(asset.id);
+      res.json(full || { id: asset.id });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -546,16 +498,16 @@ module.exports = (db) => {
     try {
       const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
       db.updateAsset(parseInt(req.params.id), {
-        name: sanitizeStr(name, 200),
-        category: sanitizeStr(category, 100),
-        serial_number: sanitizeStr(serialNumber, 100),
-        part_number: sanitizeStr(partNumber, 100),
-        description: sanitizeStr(description, 2000),
-        purchase_date: sanitizeStr(purchaseDate, 20),
-        purchase_cost: sanitizeNum(purchaseCost),
-        current_value: sanitizeNum(currentValue),
+        name,
+        category,
+        serial_number: serialNumber,
+        part_number: partNumber,
+        description,
+        purchase_date: purchaseDate,
+        purchase_cost: parseFloat(purchaseCost) || 0,
+        current_value: parseFloat(currentValue) || 0,
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
-        depreciation_rate: sanitizeNum(depreciationRate, 10),
+        depreciation_rate: parseFloat(depreciationRate) || 10,
         location_id: locationId ? parseInt(locationId) : null
       });
       res.json({ message: 'Updated' });
@@ -624,6 +576,39 @@ module.exports = (db) => {
   });
 
   // ========== PHOTOS ==========
+  // Serve thumbnail as binary image (browser-cacheable)
+  router.get('/photos/:id/thumb', auth, (req, res) => {
+    try {
+      const photo = db.getPhotoDataById(parseInt(req.params.id));
+      if (!photo || !photo.url) return res.status(404).send('Not found');
+      // Parse data URL: "data:image/jpeg;base64,/9j/..."
+      const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return res.status(400).send('Invalid photo format');
+      const contentType = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      res.set({
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Length': buffer.length
+      });
+      res.send(buffer);
+    } catch (e) {
+      res.status(500).send('Error');
+    }
+  });
+
+  // Single asset fetch (for optimistic update refresh)
+  router.get('/assets/:id', auth, (req, res) => {
+    try {
+      const asset = db.getAsset(parseInt(req.params.id));
+      if (!asset) return res.status(404).json({ error: 'Asset not found' });
+      res.json(asset);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Get full photos for an asset
   router.get('/assets/:id/photos', auth, (req, res) => {
     try {
       const photos = db.getPhotos(parseInt(req.params.id));
@@ -657,9 +642,7 @@ module.exports = (db) => {
   // ========== NOTES ==========
   router.post('/assets/:id/notes', auth, (req, res) => {
     try {
-      const text = sanitizeStr(req.body.text, 2000);
-      if (!text) return res.status(400).json({ error: 'Note text required' });
-      const note = db.addNote(parseInt(req.params.id), text, req.user.displayName || req.user.username);
+      const note = db.addNote(parseInt(req.params.id), req.body.text, req.user.displayName || req.user.username);
       res.json(note);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -812,12 +795,6 @@ module.exports = (db) => {
       console.error('Import error:', e.message);
       res.status(400).json({ error: e.message });
     }
-  });
-
-  // Global error handler - catch any unhandled route errors
-  router.use((err, req, res, next) => {
-    console.error('❌ Unhandled route error:', err.message);
-    res.status(500).json({ error: 'An internal error occurred. Please try again.' });
   });
 
   return router;
