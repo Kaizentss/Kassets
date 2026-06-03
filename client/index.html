@@ -865,10 +865,13 @@ const AssetManager = ({ user, onLogout }) => {
       const photos = newAsset.photos || [];
       delete d.photos;
       const r = await api('/assets', { method:'POST', body:JSON.stringify(d) });
-      for (const p of photos) { await api('/assets/'+r.id+'/photos', { method:'POST', body:JSON.stringify({ url:p.url, name:p.name }) }); }
-      // Optimistic: fetch the new asset and add to state
-      const fresh = await api('/assets/' + r.id);
-      setAssets(prev => [...prev, mapAsset(fresh)]);
+      const uploadedPhotos = [];
+      for (const p of photos) { try { const up = await api('/assets/'+r.id+'/photos', { method:'POST', body:JSON.stringify({ url:p.url, name:p.name }) }); uploadedPhotos.push(up); } catch(e){} }
+      // Build the asset locally from the creation response + uploaded photos
+      const mapped = mapAsset(r);
+      mapped.photos = uploadedPhotos.map(p => ({ id:p.id, asset_id:p.asset_id, name:p.name }));
+      mapped.thumbnailPhotoId = uploadedPhotos.length > 0 ? uploadedPhotos[0].id : null;
+      setAssets(prev => [...prev, mapped]);
       setShowAddAsset(false); setNewAsset({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] });
     } catch (e) { alert(e.message); }
     setLoadingAction('');
@@ -889,18 +892,19 @@ const AssetManager = ({ user, onLogout }) => {
         notes.push(`📍 MOVED: ${getLocationName(parseInt(orig.locationId))} → ${getLocationName(parseInt(editingAsset.locationId))} by ${un} on ${ts}`);
       }
       await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId }) });
-      for (const n of notes) { await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); }
-      // Optimistic: refresh just this asset
-      await refreshAsset(editingAsset.id);
+      const addedNotes = [];
+      for (const n of notes) { const nn = await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); addedNotes.push(nn); }
+      // Update state directly with editing values
+      setAssets(prev => prev.map(a => a.id === editingAsset.id ? {...editingAsset, notes:[...addedNotes, ...(a.notes||[])]} : a));
       setEditingAsset(null);
     } catch (e) { alert(e.message); }
     setLoadingAction('');
   };
 
   const handleDeleteAsset = async (id) => { const a = assets.find(x=>x.id===id); if (!confirm(`⚠️ CAUTION: You are about to permanently delete:\n\n"${a?.name || 'this asset'}"\n\nThis action cannot be undone. All photos and notes for this asset will also be deleted.\n\nAre you sure?`)) return; setLoadingAction('Deleting asset...'); try { await api('/assets/'+id,{method:'DELETE'}); setAssets(prev => prev.filter(x => x.id !== id)); setSelectedAssets(prev => prev.filter(x => x !== id)); } catch(e){ alert(e.message); } setLoadingAction(''); };
-  const handleDuplicate = async (a) => { try { const copyPhotos = a.photos?.length > 0 ? confirm(`This asset has ${a.photos.length} photo(s).\n\nCopy photos to the duplicate?`) : false; setLoadingAction('Duplicating asset...'); const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); if(copyPhotos && a.photos?.length>0){const fullPhotos=await api('/assets/'+a.id+'/photos'); for(const p of fullPhotos){try{await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})})}catch(e){}}} const fresh=await api('/assets/'+r.id); setAssets(prev => [...prev, mapAsset(fresh)]); setLoadingAction(''); } catch(e){ setLoadingAction(''); alert(e.message); } };
+  const handleDuplicate = async (a) => { try { const copyPhotos = a.photos?.length > 0 ? confirm(`This asset has ${a.photos.length} photo(s).\n\nCopy photos to the duplicate?`) : false; setLoadingAction('Duplicating asset...'); const r = await api('/assets',{method:'POST',body:JSON.stringify({name:a.name+' (Copy)',category:a.category,serialNumber:'',partNumber:a.partNumber,description:a.description,purchaseDate:a.purchaseDate,purchaseCost:a.purchaseCost,currentValue:a.currentValue,quantity:a.quantity,depreciationRate:a.depreciationRate,locationId:a.locationId})}); const uploadedPhotos=[]; if(copyPhotos && a.photos?.length>0){const fullPhotos=await api('/assets/'+a.id+'/photos'); for(const p of fullPhotos){try{const up=await api('/assets/'+r.id+'/photos',{method:'POST',body:JSON.stringify({url:p.url,name:p.name})}); uploadedPhotos.push(up);}catch(e){}}} const mapped=mapAsset(r); mapped.photos=uploadedPhotos.map(p=>({id:p.id,asset_id:p.asset_id,name:p.name})); mapped.thumbnailPhotoId=uploadedPhotos.length>0?uploadedPhotos[0].id:null; setAssets(prev => [...prev, mapped]); setLoadingAction(''); } catch(e){ setLoadingAction(''); alert(e.message); } };
   
-  const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; setLoadingAction('Deleting photo...'); try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); const updated = await refreshAsset(aid); if(editingAsset){const photos=await api('/assets/'+aid+'/photos'); setEditingAsset({...editingAsset,photos});} } catch(e){ alert(e.message); } setLoadingAction(''); };
+  const handleDeletePhoto = async (aid,pid) => { if(!confirm('⚠️ CAUTION: Delete this photo permanently?\n\nThis action cannot be undone.')) return; setLoadingAction('Deleting photo...'); try { await api('/assets/'+aid+'/photos/'+pid,{method:'DELETE'}); setAssets(prev => prev.map(a => { if(a.id!==aid) return a; const newPhotos=(a.photos||[]).filter(p=>p.id!==pid); return {...a, photos:newPhotos, thumbnailPhotoId:newPhotos.length>0?newPhotos[0].id:null}; })); if(editingAsset){const photos=await api('/assets/'+aid+'/photos'); setEditingAsset({...editingAsset,photos});} } catch(e){ alert(e.message); } setLoadingAction(''); };
   
   const handleBulkTransfer = async () => { if(!bulkTransferTo) return; try { await api('/assets/bulk-transfer',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,locationId:parseInt(bulkTransferTo)})}); setAssets(prev => prev.map(a => selectedAssets.includes(a.id) ? {...a, locationId:parseInt(bulkTransferTo)} : a)); setShowBulkTransfer(false); setSelectedAssets([]); setBulkTransferTo(''); } catch(e){ alert(e.message); } };
   const handleBulkCategory = async () => { if(!bulkCategoryTo) return; try { await api('/assets/bulk-category',{method:'POST',body:JSON.stringify({assetIds:selectedAssets,category:bulkCategoryTo})}); setAssets(prev => prev.map(a => selectedAssets.includes(a.id) ? {...a, category:bulkCategoryTo} : a)); setShowBulkCategory(false); setSelectedAssets([]); setBulkCategoryTo(''); } catch(e){ alert(e.message); } };
@@ -1114,7 +1118,7 @@ const AssetManager = ({ user, onLogout }) => {
     downloadFile('\uFEFF' + csv, `${slug}-export-${new Date().toISOString().slice(0,10)}.csv`, 'text/csv;charset=utf-8');
   };
 
-  const handleAddNote = async () => { if(!newNote.trim()||!showNotesModal) return; try { const note = await api('/assets/'+showNotesModal.id+'/notes',{method:'POST',body:JSON.stringify({text:newNote})}); setNewNote(''); const updated = await refreshAsset(showNotesModal.id); if(updated) setShowNotesModal({...showNotesModal, notes:updated.notes||[]}); } catch(e){ alert(e.message); } };
+  const handleAddNote = async () => { if(!newNote.trim()||!showNotesModal) return; try { const note = await api('/assets/'+showNotesModal.id+'/notes',{method:'POST',body:JSON.stringify({text:newNote})}); setNewNote(''); setAssets(prev => prev.map(a => a.id === showNotesModal.id ? {...a, notes:[note,...(a.notes||[])]} : a)); setShowNotesModal(prev => ({...prev, notes:[note,...(prev.notes||[])]})); } catch(e){ alert(e.message); } };
   const loadAuditLog = async () => { try { const log = await api('/audit-log'); setAuditLog(log); setShowAuditLog(true); } catch(e){ alert(e.message); } };
 
   const parseKeylistExcel = (file) => {
@@ -1191,7 +1195,7 @@ const AssetManager = ({ user, onLogout }) => {
     setShowKeylistImport(false); setKeylistData([]); loadAllData();
     alert(`Import complete! ${ok} assets imported, ${skip} skipped.`);
   };
-  const handleDeleteNote = async (nid) => { if(!confirm('⚠️ CAUTION: Delete this note permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+showNotesModal.id+'/notes/'+nid,{method:'DELETE'}); const updated = await refreshAsset(showNotesModal.id); if(updated) setShowNotesModal({...showNotesModal, notes:updated.notes||[]}); } catch(e){ alert(e.message); } };
+  const handleDeleteNote = async (nid) => { if(!confirm('⚠️ CAUTION: Delete this note permanently?\n\nThis action cannot be undone.')) return; try { await api('/assets/'+showNotesModal.id+'/notes/'+nid,{method:'DELETE'}); const newNotes = (showNotesModal.notes||[]).filter(n => n.id !== nid); setAssets(prev => prev.map(a => a.id === showNotesModal.id ? {...a, notes:newNotes} : a)); setShowNotesModal(prev => ({...prev, notes:newNotes})); } catch(e){ alert(e.message); } };
 
   const handlePhotoUpload = async (e, aid) => {
     const files = Array.from(e.target.files); if(!files.length) return;
@@ -1200,6 +1204,7 @@ const AssetManager = ({ user, onLogout }) => {
     const toUp = files.slice(0, max);
     if(files.length > max) alert(`Only uploading ${max} photo(s). Max 5.`);
     setLoadingAction('Uploading photo...');
+    const uploadedPhotos = [];
     for (const f of toUp) {
       await new Promise(res => {
         const r = new FileReader();
@@ -1207,7 +1212,8 @@ const AssetManager = ({ user, onLogout }) => {
           try {
             let photoUrl = r.result;
             if (compressPhotos) { photoUrl = await compressImage(photoUrl, 600, 0.4); }
-            await api('/assets/'+aid+'/photos',{method:'POST',body:JSON.stringify({url:photoUrl,name:f.name})});
+            const up = await api('/assets/'+aid+'/photos',{method:'POST',body:JSON.stringify({url:photoUrl,name:f.name})});
+            uploadedPhotos.push(up);
           } catch(err){}
           res();
         };
@@ -1215,8 +1221,13 @@ const AssetManager = ({ user, onLogout }) => {
       });
     }
     setLoadingAction('');
+    // Update state directly with new photos
+    setAssets(prev => prev.map(a => {
+      if(a.id!==aid) return a;
+      const allPhotos = [...(a.photos||[]), ...uploadedPhotos.map(p=>({id:p.id,asset_id:p.asset_id,name:p.name}))];
+      return {...a, photos:allPhotos, thumbnailPhotoId:allPhotos.length>0?allPhotos[0].id:a.thumbnailPhotoId};
+    }));
     if(editingAsset){const photos=await api('/assets/'+aid+'/photos'); setEditingAsset({...editingAsset,photos});}
-    await refreshAsset(aid);
     e.target.value='';
   };
 
