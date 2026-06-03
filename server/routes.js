@@ -577,11 +577,14 @@ module.exports = (db) => {
 
   // ========== PHOTOS ==========
   // Serve thumbnail as binary image (browser-cacheable)
-  router.get('/photos/:id/thumb', auth, (req, res) => {
+  // Accepts auth via query param since <img> tags can't send headers
+  router.get('/photos/:id/thumb', (req, res) => {
     try {
+      const token = req.query.token || (req.headers.authorization && req.headers.authorization.replace('Bearer ', ''));
+      if (!token) return res.status(401).send('Unauthorized');
+      try { jwt.verify(token, JWT_SECRET); } catch(e) { return res.status(401).send('Unauthorized'); }
       const photo = db.getPhotoDataById(parseInt(req.params.id));
       if (!photo || !photo.url) return res.status(404).send('Not found');
-      // Parse data URL: "data:image/jpeg;base64,/9j/..."
       const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
       if (!match) return res.status(400).send('Invalid photo format');
       const contentType = match[1];
