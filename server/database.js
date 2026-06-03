@@ -24,88 +24,22 @@ const defaultPlatform = {
 };
 
 function loadPlatform() {
-  const data = safeLoadJSON(PLATFORM_PATH, null);
-  if (data) return { ...defaultPlatform, ...data };
+  try {
+    if (fs.existsSync(PLATFORM_PATH)) {
+      const data = JSON.parse(fs.readFileSync(PLATFORM_PATH, 'utf8'));
+      return { ...defaultPlatform, ...data };
+    }
+  } catch (e) {
+    console.log('Creating new platform database...');
+  }
   return { ...defaultPlatform };
 }
 
-// ==================== ATOMIC FILE WRITE ====================
-function atomicWrite(filePath, data) {
-  const tmpPath = filePath + '.tmp';
-  const bakPath = filePath + '.bak';
-  try {
-    const jsonStr = JSON.stringify(data, null, 2);
-    // Write to temp file first
-    fs.writeFileSync(tmpPath, jsonStr);
-    // Backup existing file
-    if (fs.existsSync(filePath)) {
-      try { fs.copyFileSync(filePath, bakPath); } catch(e) {}
-    }
-    // Atomic rename
-    fs.renameSync(tmpPath, filePath);
-  } catch(e) {
-    console.error(`❌ Failed to write ${filePath}:`, e.message);
-    // Clean up temp file
-    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch(e2) {}
-    throw e;
-  }
-}
-
-function safeLoadJSON(filePath, fallback) {
-  try {
-    if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
-  } catch(e) {
-    console.error(`⚠️ Corrupt file ${filePath}, trying backup...`);
-    const bakPath = filePath + '.bak';
-    try {
-      if (fs.existsSync(bakPath)) {
-        const data = JSON.parse(fs.readFileSync(bakPath, 'utf8'));
-        // Restore from backup
-        fs.copyFileSync(bakPath, filePath);
-        console.log(`✅ Recovered from backup: ${filePath}`);
-        return data;
-      }
-    } catch(e2) {
-      console.error(`❌ Backup also corrupt for ${filePath}`);
-    }
-  }
-  return fallback;
-}
-
 function savePlatform() {
-  try {
-    atomicWrite(PLATFORM_PATH, platform);
-  } catch(e) {
-    console.error('❌ Failed to save platform:', e.message);
-  }
+  fs.writeFileSync(PLATFORM_PATH, JSON.stringify(platform, null, 2));
 }
 
 let platform = loadPlatform();
-
-// ==================== THUMBNAIL CACHE ====================
-const thumbnailCache = {};
-
-function getThumbnail(slug, photoId) {
-  const key = `${slug}:${photoId}`;
-  if (thumbnailCache[key] !== undefined) return thumbnailCache[key];
-  const photo = readPhotoFile(slug, photoId);
-  const url = photo ? photo.url : null;
-  thumbnailCache[key] = url;
-  return url;
-}
-
-function invalidateThumbnail(slug, photoId) {
-  delete thumbnailCache[`${slug}:${photoId}`];
-}
-
-function invalidateAssetThumbnails(slug, assetId, cData) {
-  const photoMetas = cData.photos.filter(p => p.asset_id === assetId);
-  for (const pm of photoMetas) {
-    delete thumbnailCache[`${slug}:${pm.id}`];
-  }
-}
 
 // ==================== COMPANY DATA (per-company JSON files) ====================
 const defaultCompanyData = {
@@ -143,30 +77,31 @@ function readPhotoFile(slug, photoId) {
     if (fs.existsSync(filePath)) {
       return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
-  } catch(e) {
-    console.error(`⚠️ Failed to read photo ${photoId}:`, e.message);
-  }
+  } catch(e) {}
   return null;
 }
 
 function writePhotoFile(slug, photo) {
-  try {
-    const dir = getPhotoStorePath(slug);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const filePath = path.join(dir, `${photo.id}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(photo));
-  } catch(e) {
-    console.error(`❌ Failed to write photo ${photo.id}:`, e.message);
-  }
+  const dir = getPhotoStorePath(slug);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${photo.id}.json`), JSON.stringify(photo));
 }
 
 function deletePhotoFile(slug, photoId) {
   try {
     const filePath = path.join(getPhotoStorePath(slug), `${photoId}.json`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  } catch(e) {
-    console.error(`⚠️ Failed to delete photo file ${photoId}:`, e.message);
+  } catch(e) {}
+}
+
+// Find a single photo's data by ID (searches all companies)
+function getPhotoData(photoId) {
+  for (const company of platform.companies) {
+    const slug = company.slug || slugify(company.name);
+    const photo = readPhotoFile(slug, photoId);
+    if (photo) return photo;
   }
+  return null;
 }
 
 function loadCompanyData(companyId) {
@@ -179,48 +114,30 @@ function loadCompanyData(companyId) {
   const slug = company.slug || slugify(company.name);
   const filePath = getCompanyFilePath(slug);
 
-  const data = safeLoadJSON(filePath, null);
-  if (data) {
-    companyCache[companyId] = { data: { ...defaultCompanyData, ...data }, slug };
-    return companyCache[companyId].data;
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      companyCache[companyId] = { data: { ...defaultCompanyData, ...data }, slug };
+      return companyCache[companyId].data;
+    }
+  } catch (e) {
+    console.log(`Creating new database for company: ${company.name}`);
   }
 
-  const freshData = { ...defaultCompanyData, assets: [], locations: [], categories: [], settings: [], photos: [], notes: [], audit_log: [] };
+  const freshData = { ...defaultCompanyData, assets: [], locations: [], categories: [], settings: [], photos: [], notes: [] };
   companyCache[companyId] = { data: freshData, slug };
   return freshData;
 }
 
-// Debounce timers for company saves
-const saveTimers = {};
-const SAVE_DELAY = 500; // ms
-
-function saveCompanyData(companyId, immediate) {
+function saveCompanyData(companyId) {
   const company = platform.companies.find(c => c.id === companyId);
   if (!company) return;
 
   const slug = company.slug || slugify(company.name);
   const filePath = getCompanyFilePath(slug);
   const data = companyCache[companyId]?.data;
-  if (!data) return;
-
-  const doSave = () => {
-    try {
-      atomicWrite(filePath, data);
-    } catch(e) {
-      console.error(`❌ Failed to save company ${company.name}:`, e.message);
-    }
-  };
-
-  if (immediate) {
-    if (saveTimers[companyId]) { clearTimeout(saveTimers[companyId]); delete saveTimers[companyId]; }
-    doSave();
-  } else {
-    // Debounce: if multiple saves happen within SAVE_DELAY, only the last one writes to disk
-    if (saveTimers[companyId]) clearTimeout(saveTimers[companyId]);
-    saveTimers[companyId] = setTimeout(() => {
-      doSave();
-      delete saveTimers[companyId];
-    }, SAVE_DELAY);
+  if (data) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
   }
 }
 
@@ -348,29 +265,6 @@ try {
 } catch (e) { /* ignore */ }
 
 // ==================== DATABASE INTERFACE ====================
-
-// Preload thumbnail cache on startup
-function preloadThumbnails() {
-  let count = 0;
-  for (const company of platform.companies) {
-    const cData = loadCompanyData(company.id);
-    const slug = getCompanySlug(company.id);
-    if (!slug) continue;
-    // Group photos by asset, only cache first photo per asset
-    const assetFirstPhoto = {};
-    for (const p of cData.photos) {
-      if (!assetFirstPhoto[p.asset_id]) assetFirstPhoto[p.asset_id] = p.id;
-    }
-    for (const photoId of Object.values(assetFirstPhoto)) {
-      getThumbnail(slug, photoId);
-      count++;
-    }
-  }
-  console.log(`📷 Preloaded ${count} thumbnails into cache`);
-}
-
-// Run preload after a short delay so server starts accepting requests immediately
-setTimeout(preloadThumbnails, 2000);
 
 module.exports = {
   // ========== UTILITY ==========
@@ -546,39 +440,46 @@ module.exports = {
   // ========== ASSETS (company-scoped) ==========
   getAssets: (companyId) => {
     const cData = loadCompanyData(companyId);
-    const slug = getCompanySlug(companyId);
     return cData.assets.map(a => {
       const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
-      let thumbnail = null;
-      if (photoMetas.length > 0 && slug) {
-        thumbnail = getThumbnail(slug, photoMetas[0].id);
-      }
       return {
         ...a,
         location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
         photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
-        thumbnail,
+        thumbnailPhotoId: photoMetas.length > 0 ? photoMetas[0].id : null,
         notes: cData.notes.filter(n => n.asset_id === a.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       };
     });
+  },
+  getAsset: (assetId) => {
+    for (const company of platform.companies) {
+      const cData = loadCompanyData(company.id);
+      const a = cData.assets.find(x => x.id === assetId);
+      if (a) {
+        const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
+        return {
+          ...a,
+          location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
+          photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+          thumbnailPhotoId: photoMetas.length > 0 ? photoMetas[0].id : null,
+          notes: cData.notes.filter(n => n.asset_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))
+        };
+      }
+    }
+    return null;
   },
   getAllAssets: () => {
     let allAssets = [];
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
-      const slug = getCompanySlug(company.id);
       allAssets = allAssets.concat(cData.assets.map(a => {
         const photoMetas = cData.photos.filter(p => p.asset_id === a.id);
-        let thumbnail = null;
-        if (photoMetas.length > 0 && slug) {
-          thumbnail = getThumbnail(slug, photoMetas[0].id);
-        }
         return {
           ...a,
           company_name: company.name,
           location_name: cData.locations.find(l => l.id === a.location_id)?.name || 'Unknown',
           photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
-          thumbnail,
+          thumbnailPhotoId: photoMetas.length > 0 ? photoMetas[0].id : null,
           notes: cData.notes.filter(n => n.asset_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))
         };
       }));
@@ -756,6 +657,8 @@ module.exports = {
   },
 
   // ========== PHOTOS ==========
+  getPhotoDataById: (photoId) => getPhotoData(photoId),
+
   getPhotos: (assetId) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
@@ -777,14 +680,9 @@ module.exports = {
       if (cData.assets.find(a => a.id === assetId)) {
         const photo = { id: nextGlobalId('photos'), asset_id: assetId, url, name, created_at: new Date().toISOString() };
         const slug = getCompanySlug(company.id);
-        if (slug) {
-          writePhotoFile(slug, photo);
-          // If this is the first photo, cache it as thumbnail
-          const existingPhotos = cData.photos.filter(p => p.asset_id === assetId);
-          if (existingPhotos.length === 0) {
-            thumbnailCache[`${slug}:${photo.id}`] = url;
-          }
-        }
+        // Save full photo to individual file
+        if (slug) writePhotoFile(slug, photo);
+        // Only store metadata in main JSON
         cData.photos.push({ id: photo.id, asset_id: photo.asset_id, name: photo.name });
         saveCompanyData(company.id);
         return photo;
@@ -799,10 +697,7 @@ module.exports = {
       if (photo) {
         cData.photos = cData.photos.filter(p => p.id !== id);
         const slug = getCompanySlug(company.id);
-        if (slug) {
-          deletePhotoFile(slug, id);
-          invalidateThumbnail(slug, id);
-        }
+        if (slug) deletePhotoFile(slug, id);
         saveCompanyData(company.id);
         return;
       }
@@ -1153,22 +1048,3 @@ module.exports = {
     };
   }
 };
-
-// ==================== GRACEFUL SHUTDOWN ====================
-function flushAllSaves() {
-  for (const companyId of Object.keys(saveTimers)) {
-    clearTimeout(saveTimers[companyId]);
-    delete saveTimers[companyId];
-    const company = platform.companies.find(c => c.id === parseInt(companyId));
-    if (company) {
-      const slug = company.slug || slugify(company.name);
-      const filePath = getCompanyFilePath(slug);
-      const data = companyCache[companyId]?.data;
-      if (data) {
-        try { atomicWrite(filePath, data); console.log(`💾 Flushed save for ${company.name}`); } catch(e) { console.error(`❌ Failed to flush ${company.name}:`, e.message); }
-      }
-    }
-  }
-}
-process.on('SIGTERM', () => { console.log('🛑 SIGTERM received, flushing saves...'); flushAllSaves(); process.exit(0); });
-process.on('SIGINT', () => { console.log('🛑 SIGINT received, flushing saves...'); flushAllSaves(); process.exit(0); });
