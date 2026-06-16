@@ -1,0 +1,860 @@
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const path = require('path');
+const { auth, isSuperAdmin, isMasterAdmin, isAdmin, canEdit, sameCompany } = require('./middleware/auth');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'kassets-secret-key';
+if (JWT_SECRET === 'kassets-secret-key') console.warn('⚠️  Using default JWT secret! Set JWT_SECRET env var for production.');
+
+// ========== RATE LIMITING ==========
+const loginAttempts = {};
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 10;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  if (!loginAttempts[ip]) loginAttempts[ip] = [];
+  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
+  if (loginAttempts[ip].length >= MAX_ATTEMPTS) return false;
+  loginAttempts[ip].push(now);
+  return true;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const ip of Object.keys(loginAttempts)) {
+    loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
+    if (loginAttempts[ip].length === 0) delete loginAttempts[ip];
+  }
+}, 5 * 60 * 1000);
+
+// ========== INPUT HELPERS ==========
+function sanitizeStr(val, maxLen = 500) {
+  if (typeof val !== 'string') return '';
+  return val.trim().slice(0, maxLen);
+}
+
+function sanitizeNum(val, fallback = 0) {
+  const n = parseFloat(val);
+  return isNaN(n) ? fallback : n;
+}
+
+const MIN_PASSWORD_LENGTH = 6;
+
+module.exports = (db) => {
+  const router = express.Router();
+
+  // Helper: get the effective company ID for the current user
+  const getCompanyId = (req) => {
+    if (req.user.role === 'super_admin') {
+      // Super admin can specify a company via query param or header
+      return parseInt(req.query.companyId) || parseInt(req.headers['x-company-id']) || null;
+    }
+    return req.user.companyId;
+  };
+
+  // ========== AUTH ==========
+  router.post('/auth/login', (req, res) => {
+    try {
+      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+      if (!checkRateLimit(ip)) {
+        return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
+      }
+      const { username, password } = req.body;
+      if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+      const user = db.getUser(sanitizeStr(username, 100));
+      if (!user || !bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Check if company is active (for non-super admins)
+      if (user.company_id) {
+        const company = db.getCompany(user.company_id);
+        if (!company || !company.is_active) {
+          return res.status(401).json({ error: 'Company account is inactive' });
+        }
+      }
+      
+      const tokenPayload = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        displayName: user.display_name,
+        companyId: user.company_id
+      };
+      
+      const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+      
+      const company = user.company_id ? db.getCompany(user.company_id) : null;
+      
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name,
+          role: user.role,
+          companyId: user.company_id,
+          companyName: company?.name || null
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get('/auth/me', auth, (req, res) => {
+    const user = db.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const company = user.company_id ? db.getCompany(user.company_id) : null;
+    res.json({
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      email: user.email,
+      role: user.role,
+      companyId: user.company_id,
+      companyName: company?.name || null
+    });
+  });
+
+  router.post('/auth/change-password', auth, (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      }
+      const user = db.getUserById(req.user.id);
+      if (!user || !bcrypt.compareSync(currentPassword, user.password)) {
+        return res.status(400).json({ error: 'Wrong current password' });
+      }
+      db.updateUser(req.user.id, { password: bcrypt.hashSync(newPassword, 10) });
+      res.json({ message: 'Password changed' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== SUPER ADMIN: COMPANIES ==========
+  router.get('/companies', auth, isSuperAdmin, (req, res) => {
+    const companies = db.getCompanies().map(c => ({
+      ...c,
+      stats: db.getCompanyStats(c.id)
+    }));
+    res.json(companies);
+  });
+
+  router.post('/companies', auth, isSuperAdmin, (req, res) => {
+    try {
+      const { name, address, phone, email } = req.body;
+      if (!name) return res.status(400).json({ error: 'Company name required' });
+      const company = db.createCompany({ name, address, phone, email });
+      res.json(company);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put('/companies/:id', auth, isSuperAdmin, (req, res) => {
+    try {
+      const { name, address, phone, email, is_active, compress_photos } = req.body;
+      db.updateCompany(parseInt(req.params.id), { name, address, phone, email, is_active, compress_photos });
+      res.json({ message: 'Updated' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/companies/:id', auth, isSuperAdmin, (req, res) => {
+    try {
+      db.deleteCompany(parseInt(req.params.id));
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // ========== SUPER ADMIN: CREATE MASTER ADMINS ==========
+  router.post('/companies/:id/master-admin', auth, isSuperAdmin, (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id);
+      const company = db.getCompany(companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      const { username, password, displayName, email } = req.body;
+      if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+      if (password.length < MIN_PASSWORD_LENGTH) return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+
+      const user = db.createUser({
+        username: sanitizeStr(username, 50).toLowerCase().replace(/[^a-z0-9._-]/g, ''),
+        password: bcrypt.hashSync(password, 10),
+        display_name: sanitizeStr(displayName || username, 100),
+        email: sanitizeStr(email || '', 200),
+        role: 'master_admin',
+        company_id: companyId,
+        is_active: 1
+      });
+
+      res.json({ id: user.id });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Super admin: view all users across all companies
+  router.get('/all-users', auth, isSuperAdmin, (req, res) => {
+    const users = db.getAllUsers().map(u => ({
+      ...u,
+      company_name: u.company_id ? db.getCompany(u.company_id)?.name || 'Unknown' : 'Platform'
+    }));
+    res.json(users);
+  });
+
+  // Super admin: delete a user from a specific company
+  router.delete('/companies/:companyId/users/:userId', auth, isSuperAdmin, (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const targetUser = db.getUserById(userId);
+      if (!targetUser) return res.status(404).json({ error: 'User not found' });
+      if (targetUser.role === 'super_admin') return res.status(403).json({ error: 'Cannot delete a super admin' });
+      db.deleteUser(userId);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Super admin: view a specific company's data
+  router.get('/companies/:id/overview', auth, isSuperAdmin, (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id);
+      const company = db.getCompany(companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      const stats = db.getCompanyStats(companyId);
+      const users = db.getUsers(companyId);
+      const locations = db.getLocations(companyId);
+      const categories = db.getCategories(companyId);
+      const assets = db.getAssets(companyId);
+
+      res.json({ company, stats, users, locations, categories, assets });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== USERS (company-scoped) ==========
+  router.get('/users', auth, isAdmin, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json(db.getAllUsers());
+    res.json(db.getUsers(companyId));
+  });
+
+  router.post('/users', auth, isAdmin, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+
+      const { username, password, displayName, email, role } = req.body;
+      if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+      if (password.length < MIN_PASSWORD_LENGTH) return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      const cleanUsername = sanitizeStr(username, 50).toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (cleanUsername.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters (letters, numbers, ._-)' });
+
+      // Validate role hierarchy
+      const allowedRoles = { master_admin: ['admin', 'editor', 'viewer'], admin: ['editor', 'viewer'] };
+      const creatorAllowed = allowedRoles[req.user.role] || [];
+      
+      // Super admin can create any role
+      if (req.user.role === 'super_admin') {
+        // allow anything
+      } else if (req.user.role === 'master_admin') {
+        if (!['master_admin', 'admin', 'editor', 'viewer'].includes(role)) {
+          return res.status(403).json({ error: 'Master admins can create master_admin, admin, editor, or viewer roles' });
+        }
+      } else if (req.user.role === 'admin') {
+        if (!['editor', 'viewer'].includes(role)) {
+          return res.status(403).json({ error: 'Admins can only create editor or viewer roles' });
+        }
+      }
+
+      const user = db.createUser({
+        username: cleanUsername,
+        password: bcrypt.hashSync(password, 10),
+        display_name: sanitizeStr(displayName || username, 100),
+        email: sanitizeStr(email || '', 200),
+        role: role || 'viewer',
+        company_id: companyId,
+        is_active: 1
+      });
+      res.json({ id: user.id });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  router.put('/users/:id', auth, isAdmin, (req, res) => {
+    try {
+      const targetUser = db.getUserById(parseInt(req.params.id));
+      if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+      // Ensure same company (unless super admin)
+      if (req.user.role !== 'super_admin' && targetUser.company_id !== req.user.companyId) {
+        return res.status(403).json({ error: 'Cannot edit users from another company' });
+      }
+
+      // Can't edit someone of higher role (unless super admin); master admins can edit peers
+      const roleHierarchy = { super_admin: 5, master_admin: 4, admin: 3, editor: 2, viewer: 1 };
+      if (req.user.role !== 'super_admin') {
+        if (req.user.role === 'master_admin') {
+          if (roleHierarchy[targetUser.role] > roleHierarchy[req.user.role]) {
+            return res.status(403).json({ error: 'Cannot edit a user with a higher role' });
+          }
+        } else if (roleHierarchy[targetUser.role] >= roleHierarchy[req.user.role]) {
+          return res.status(403).json({ error: 'Cannot edit a user with equal or higher role' });
+        }
+      }
+
+      const { displayName, email, role, isActive } = req.body;
+      
+      // Validate role change
+      if (role) {
+        if (req.user.role === 'master_admin' && !['master_admin', 'admin', 'editor', 'viewer'].includes(role)) {
+          return res.status(403).json({ error: 'Invalid role for master admin to assign' });
+        }
+        if (req.user.role === 'admin' && !['editor', 'viewer'].includes(role)) {
+          return res.status(403).json({ error: 'Invalid role for admin to assign' });
+        }
+      }
+
+      db.updateUser(parseInt(req.params.id), {
+        display_name: displayName,
+        email,
+        role: role || targetUser.role,
+        is_active: isActive !== undefined ? (isActive ? 1 : 0) : targetUser.is_active
+      });
+      res.json({ message: 'Updated' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/users/:id/reset-password', auth, isAdmin, (req, res) => {
+    try {
+      const targetUser = db.getUserById(parseInt(req.params.id));
+      if (!targetUser) return res.status(404).json({ error: 'User not found' });
+      
+      if (req.user.role !== 'super_admin' && targetUser.company_id !== req.user.companyId) {
+        return res.status(403).json({ error: 'Cannot reset password for user from another company' });
+      }
+
+      db.updateUser(parseInt(req.params.id), { password: bcrypt.hashSync(req.body.newPassword, 10) });
+      res.json({ message: 'Password reset' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/users/:id', auth, isAdmin, (req, res) => {
+    try {
+      if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
+      
+      const targetUser = db.getUserById(parseInt(req.params.id));
+      if (!targetUser) return res.status(404).json({ error: 'User not found' });
+      
+      if (req.user.role !== 'super_admin' && targetUser.company_id !== req.user.companyId) {
+        return res.status(403).json({ error: 'Cannot delete user from another company' });
+      }
+
+      const roleHierarchy = { super_admin: 5, master_admin: 4, admin: 3, editor: 2, viewer: 1 };
+      
+      // Super admin can delete anyone except other super admins
+      if (req.user.role === 'super_admin') {
+        if (targetUser.role === 'super_admin') {
+          return res.status(403).json({ error: 'Cannot delete another super admin' });
+        }
+      } else if (req.user.role === 'master_admin') {
+        // Master admins can delete other master admins (same company) and below
+        if (roleHierarchy[targetUser.role] > roleHierarchy[req.user.role]) {
+          return res.status(403).json({ error: 'Cannot delete a user with a higher role' });
+        }
+      } else {
+        // Admins can only delete lower roles
+        if (roleHierarchy[targetUser.role] >= roleHierarchy[req.user.role]) {
+          return res.status(403).json({ error: 'Cannot delete a user with equal or higher role' });
+        }
+      }
+
+      db.deleteUser(parseInt(req.params.id));
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== SETTINGS (company-scoped) ==========
+  router.get('/settings', auth, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json({ company_name: 'KASSETS Platform' });
+    const settings = db.getSettings(companyId);
+    // Include company-level compress_photos setting (managed by super_admin)
+    const company = db.getCompanies().find(c => c.id === companyId);
+    if (company && company.compress_photos !== undefined) settings.compress_photos = company.compress_photos;
+    res.json(settings);
+  });
+
+  router.put('/settings', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const updates = {};
+      // Only master_admin can change company name and default colors
+      if (req.user.role === 'master_admin') {
+        updates.company_name = req.body.companyName || '';
+        if (req.body.brandColor) updates.brand_color = req.body.brandColor;
+        if (req.body.bgColor1) updates.bg_color_1 = req.body.bgColor1;
+        if (req.body.bgColor2) updates.bg_color_2 = req.body.bgColor2;
+      }
+      if (req.body.compressPhotos !== undefined) updates.compress_photos = req.body.compressPhotos;
+      db.updateSettings(companyId, updates);
+      res.json({ message: 'Saved' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== LOCATIONS (company-scoped) ==========
+  router.get('/locations', auth, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json([]);
+    res.json(db.getLocations(companyId));
+  });
+
+  router.post('/locations', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const loc = db.createLocation({ company_id: companyId, name: req.body.name, address: req.body.address || '' });
+      res.json({ id: loc.id });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put('/locations/:id', auth, canEdit, (req, res) => {
+    try {
+      db.updateLocation(parseInt(req.params.id), { name: req.body.name, address: req.body.address });
+      res.json({ message: 'Updated' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/locations/:id', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      const loc = db.getLocation(parseInt(req.params.id));
+      db.deleteLocation(parseInt(req.params.id));
+      if (companyId && loc) db.addAuditLog(companyId, 'deleted', 'location', loc.name, req.user.displayName || req.user.username);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // ========== CATEGORIES (company-scoped) ==========
+  router.get('/categories', auth, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json([]);
+    res.json(db.getCategories(companyId));
+  });
+
+  router.post('/categories', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const cat = db.createCategory(companyId, req.body.name);
+      res.json({ id: cat.id });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  router.post('/categories/rename', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const { oldName, newName } = req.body;
+      db.renameCategory(companyId, oldName, newName);
+      res.json({ message: 'Category renamed' });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  router.delete('/categories/:id', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const cats = db.getCategories(companyId);
+      const cat = cats.find(c => c.id === parseInt(req.params.id));
+      db.deleteCategory(parseInt(req.params.id), companyId);
+      if (cat) db.addAuditLog(companyId, 'deleted', 'category', cat.name, req.user.displayName || req.user.username);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // ========== ASSETS (company-scoped) ==========
+  router.get('/assets', auth, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json([]);
+    res.json(db.getAssets(companyId));
+  });
+
+  router.post('/assets', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
+      if (!name || !sanitizeStr(name).length) return res.status(400).json({ error: 'Asset name required' });
+      const asset = db.createAsset({
+        company_id: companyId,
+        name: sanitizeStr(name, 200),
+        category: sanitizeStr(category || 'Other', 100),
+        serial_number: sanitizeStr(serialNumber || '', 100),
+        part_number: sanitizeStr(partNumber || '', 100),
+        description: sanitizeStr(description || '', 2000),
+        purchase_date: sanitizeStr(purchaseDate || '', 20),
+        purchase_cost: sanitizeNum(purchaseCost),
+        current_value: sanitizeNum(currentValue) || sanitizeNum(purchaseCost),
+        quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
+        depreciation_rate: sanitizeNum(depreciationRate, 10),
+        location_id: locationId ? parseInt(locationId) : null
+      });
+      const full = db.getAsset(asset.id);
+      res.json(full || { id: asset.id });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put('/assets/:id', auth, canEdit, (req, res) => {
+    try {
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
+      db.updateAsset(parseInt(req.params.id), {
+        name: sanitizeStr(name, 200),
+        category: sanitizeStr(category, 100),
+        serial_number: sanitizeStr(serialNumber, 100),
+        part_number: sanitizeStr(partNumber, 100),
+        description: sanitizeStr(description, 2000),
+        purchase_date: sanitizeStr(purchaseDate, 20),
+        purchase_cost: sanitizeNum(purchaseCost),
+        current_value: sanitizeNum(currentValue),
+        quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
+        depreciation_rate: sanitizeNum(depreciationRate, 10),
+        location_id: locationId ? parseInt(locationId) : null
+      });
+      res.json({ message: 'Updated' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/assets/:id', auth, canEdit, (req, res) => {
+    try {
+      const asset = db.getAsset(parseInt(req.params.id));
+      const companyId = getCompanyId(req);
+      db.deleteAsset(parseInt(req.params.id));
+      if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, req.user.displayName || req.user.username);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/assets/bulk-transfer', auth, canEdit, (req, res) => {
+    try {
+      const { assetIds, locationId } = req.body;
+      const loc = db.getLocation(parseInt(locationId));
+      assetIds.forEach(id => {
+        const asset = db.getAsset(id);
+        const oldLoc = asset?.location_id ? db.getLocation(asset.location_id) : null;
+        db.updateAsset(id, { location_id: parseInt(locationId) });
+        db.addNote(id, `Transferred from ${oldLoc?.name || 'Unknown'} to ${loc?.name}`, req.user.displayName || req.user.username);
+      });
+      res.json({ message: `${assetIds.length} assets transferred` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/assets/bulk-category', auth, canEdit, (req, res) => {
+    try {
+      const { assetIds, category } = req.body;
+      assetIds.forEach(id => {
+        const asset = db.getAsset(id);
+        const oldCategory = asset?.category || 'Unknown';
+        db.updateAsset(id, { category });
+        db.addNote(id, `Category changed from "${oldCategory}" to "${category}"`, req.user.displayName || req.user.username);
+      });
+      res.json({ message: `${assetIds.length} assets updated` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/assets/bulk-delete', auth, canEdit, (req, res) => {
+    try {
+      const { assetIds } = req.body;
+      const companyId = getCompanyId(req);
+      const who = req.user.displayName || req.user.username;
+      assetIds.forEach(id => {
+        const asset = db.getAsset(id);
+        db.deleteAsset(id);
+        if (companyId && asset) db.addAuditLog(companyId, 'deleted', 'asset', asset.name, who);
+      });
+      res.json({ message: `${assetIds.length} assets deleted` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== PHOTOS ==========
+  // Serve thumbnail as binary image (browser-cacheable)
+  // Accepts auth via query param since <img> tags can't send headers
+  router.get('/photos/:id/thumb', (req, res) => {
+    try {
+      const token = req.query.token || (req.headers.authorization && req.headers.authorization.replace('Bearer ', ''));
+      if (!token) return res.status(401).send('Unauthorized');
+      try { jwt.verify(token, JWT_SECRET); } catch(e) { return res.status(401).send('Unauthorized'); }
+      const photo = db.getPhotoDataById(parseInt(req.params.id));
+      if (!photo || !photo.url) return res.status(404).send('Not found');
+      const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return res.status(400).send('Invalid photo format');
+      const contentType = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      res.set({
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Length': buffer.length
+      });
+      res.send(buffer);
+    } catch (e) {
+      res.status(500).send('Error');
+    }
+  });
+
+  // Single asset fetch (for optimistic update refresh)
+  router.get('/assets/:id', auth, (req, res) => {
+    try {
+      const asset = db.getAsset(parseInt(req.params.id));
+      if (!asset) return res.status(404).json({ error: 'Asset not found' });
+      res.json(asset);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Get full photos for an asset
+  router.get('/assets/:id/photos', auth, (req, res) => {
+    try {
+      const photos = db.getPhotos(parseInt(req.params.id));
+      res.json(photos);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/assets/:id/photos', auth, canEdit, (req, res) => {
+    try {
+      const photo = db.addPhoto(parseInt(req.params.id), req.body.url, req.body.name);
+      res.json(photo);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/assets/:assetId/photos/:photoId', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      const asset = db.getAsset(parseInt(req.params.assetId));
+      db.deletePhoto(parseInt(req.params.photoId));
+      if (companyId) db.addAuditLog(companyId, 'deleted', 'photo', `Photo from "${asset?.name || 'Unknown'}"`, req.user.displayName || req.user.username);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== NOTES ==========
+  router.post('/assets/:id/notes', auth, (req, res) => {
+    try {
+      const text = sanitizeStr(req.body.text, 2000);
+      if (!text) return res.status(400).json({ error: 'Note text required' });
+      const note = db.addNote(parseInt(req.params.id), text, req.user.displayName || req.user.username);
+      res.json(note);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/assets/:assetId/notes/:noteId', auth, canEdit, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      const asset = db.getAsset(parseInt(req.params.assetId));
+      db.deleteNote(parseInt(req.params.noteId));
+      if (companyId) db.addAuditLog(companyId, 'deleted', 'note', `Note from "${asset?.name || 'Unknown'}"`, req.user.displayName || req.user.username);
+      res.json({ message: 'Deleted' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== AUDIT LOG ==========
+  router.get('/audit-log', auth, isAdmin, (req, res) => {
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.json([]);
+    res.json(db.getAuditLog(companyId));
+  });
+
+  // ========== FULL PLATFORM EXPORT (Super Admin only) ==========
+  router.get('/export-platform', auth, isSuperAdmin, (req, res) => {
+    try {
+      const data = db.exportFullPlatform();
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ========== PHOTO RESTORE (Super Admin) ==========
+  const restoreCompaniesDir = path.join(__dirname, '..', 'database', 'companies');
+  
+  router.get('/photo-restore/status', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const backupFiles = [];
+      if (fs.existsSync(restoreCompaniesDir)) {
+        fs.readdirSync(restoreCompaniesDir).forEach(f => {
+          if (f.endsWith('-photos-backup.json')) {
+            const stat = fs.statSync(path.join(restoreCompaniesDir, f));
+            const companySlug = f.replace('-photos-backup.json', '');
+            backupFiles.push({ file: f, slug: companySlug, size: stat.size });
+          }
+        });
+      }
+      res.json({ backups: backupFiles });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.get('/photo-restore/count/:slug', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const { slug } = req.params;
+      const splitDir = path.join(restoreCompaniesDir, `${slug}-photos-split`);
+      
+      // Check if already split
+      if (fs.existsSync(splitDir)) {
+        const files = fs.readdirSync(splitDir).filter(f => f.endsWith('.json'));
+        return res.json({ total: files.length, slug, split: true });
+      }
+      
+      // Check if backup exists
+      const backupPath = path.join(restoreCompaniesDir, `${slug}-photos-backup.json`);
+      if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
+      
+      return res.json({ total: 0, slug, split: false, needsSplit: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.post('/photo-restore/split/:slug', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const { slug } = req.params;
+      const backupPath = path.join(restoreCompaniesDir, `${slug}-photos-backup.json`);
+      if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
+      
+      // This will use a lot of memory but only happens once
+      const photos = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      const splitDir = path.join(restoreCompaniesDir, `${slug}-photos-split`);
+      if (!fs.existsSync(splitDir)) fs.mkdirSync(splitDir, { recursive: true });
+      
+      for (let i = 0; i < photos.length; i++) {
+        fs.writeFileSync(path.join(splitDir, `${i}.json`), JSON.stringify(photos[i]));
+      }
+      
+      const count = photos.length;
+      photos.length = 0;
+      res.json({ split: true, total: count });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.post('/photo-restore/restore-one/:slug/:index', auth, isSuperAdmin, (req, res) => {
+    try {
+      const fs = require('fs');
+      const { slug, index } = req.params;
+      const idx = parseInt(index);
+      const photoPath = path.join(restoreCompaniesDir, `${slug}-photos-split`, `${idx}.json`);
+      
+      if (!fs.existsSync(photoPath)) return res.json({ done: true });
+      
+      const photo = JSON.parse(fs.readFileSync(photoPath, 'utf8'));
+      
+      if (!photo || !photo.asset_id || !photo.url) {
+        return res.json({ skipped: true, index: idx, reason: 'Invalid photo data' });
+      }
+      
+      const asset = db.getAsset(photo.asset_id);
+      if (!asset) {
+        return res.json({ skipped: true, index: idx, reason: `Asset #${photo.asset_id} not found` });
+      }
+      
+      db.addPhoto(photo.asset_id, photo.url, photo.name || 'restored');
+      res.json({ restored: true, index: idx, assetId: photo.asset_id });
+    } catch(e) { 
+      res.status(500).json({ error: e.message }); 
+    }
+  });
+
+  // ========== IMPORT LEGACY DATABASE (Super Admin only) ==========
+  router.post('/import-legacy', auth, isSuperAdmin, (req, res) => {
+    try {
+      const { legacyData, companyName, masterAdmin } = req.body;
+
+      if (!legacyData) {
+        return res.status(400).json({ error: 'legacyData is required (the old Kassets v1 database JSON)' });
+      }
+      if (!companyName) {
+        return res.status(400).json({ error: 'companyName is required (name for the new company)' });
+      }
+
+      const result = db.importLegacyData(legacyData, companyName, masterAdmin || null);
+
+      console.log(`\n🔄 LEGACY IMPORT COMPLETE:`);
+      console.log(`   Company: ${result.companyName} (ID: ${result.companyId})`);
+      console.log(`   Assets: ${result.imported.assets}, Locations: ${result.imported.locations}`);
+      console.log(`   Categories: ${result.imported.categories}, Photos: ${result.imported.photos}, Notes: ${result.imported.notes}`);
+      console.log(`   Users: ${result.imported.users.length}\n`);
+
+      res.json({
+        message: 'Legacy data imported successfully',
+        ...result
+      });
+    } catch (e) {
+      console.error('Import error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Global error handler
+  router.use((err, req, res, next) => {
+    console.error('❌ Unhandled route error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  return router;
+};
