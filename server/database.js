@@ -574,7 +574,7 @@ module.exports = {
   createLocation: (loc) => {
     const companyId = loc.company_id;
     const cData = loadCompanyData(companyId);
-    const newLoc = { id: nextGlobalId('locations'), ...loc, created_at: new Date().toISOString() };
+    const newLoc = { id: nextGlobalId('locations'), ...loc, parent_id: loc.parent_id || null, created_at: new Date().toISOString() };
     cData.locations.push(newLoc);
     saveCompanyData(companyId);
     return newLoc;
@@ -595,8 +595,12 @@ module.exports = {
       const cData = loadCompanyData(company.id);
       const loc = cData.locations.find(l => l.id === id);
       if (loc) {
+        // Check for assets in this location
         const count = cData.assets.filter(a => a.location_id === id).length;
         if (count > 0) throw new Error(`${count} assets in this location`);
+        // Check for child locations
+        const children = cData.locations.filter(l => l.parent_id === id);
+        if (children.length > 0) throw new Error(`${children.length} sublocation(s) under this location — move or delete them first`);
         cData.locations = cData.locations.filter(l => l.id !== id);
         saveCompanyData(company.id);
         return;

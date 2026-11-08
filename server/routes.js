@@ -435,7 +435,7 @@ module.exports = (db) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
-      const loc = db.createLocation({ company_id: companyId, name: req.body.name, address: req.body.address || '' });
+      const loc = db.createLocation({ company_id: companyId, name: req.body.name, address: req.body.address || '', parent_id: req.body.parentId ? parseInt(req.body.parentId) : null });
       res.json({ id: loc.id });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -444,7 +444,7 @@ module.exports = (db) => {
 
   router.put('/locations/:id', auth, canEdit, (req, res) => {
     try {
-      db.updateLocation(parseInt(req.params.id), { name: req.body.name, address: req.body.address });
+      db.updateLocation(parseInt(req.params.id), { name: req.body.name, address: req.body.address, parent_id: req.body.parentId ? parseInt(req.body.parentId) : null });
       res.json({ message: 'Updated' });
     } catch (e) {
       res.status(500).json({ error: e.message });
