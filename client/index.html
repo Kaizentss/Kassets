@@ -761,6 +761,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [bulkCategoryTo, setBulkCategoryTo] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
+  const [locationSearch, setLocationSearch] = useState('');
   const [showNotesModal, setShowNotesModal] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(null);
   const [loadingAction, setLoadingAction] = useState('');
@@ -1381,7 +1382,7 @@ const AssetManager = ({ user, onLogout }) => {
           <div>
             <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
               <input type="text" className="input-field" placeholder="Search assets..." style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-              <select className="input-field" style={{ maxWidth:180 }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setSelectedAssets([]); }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+              <select className="input-field" style={{ maxWidth:220 }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setSelectedAssets([]); }}><option value="all">All Locations ({assets.length})</option>{locations.map(l => { const cnt = assets.filter(a => a.locationId === l.id).length; return <option key={l.id} value={l.id}>{l.name} ({cnt})</option>; })}</select>
               <select className="input-field" style={{ maxWidth:180 }} value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setSelectedAssets([]); }}><option value="all">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
               <button className="btn-secondary" style={{ padding:'10px 16px', fontSize:12, minWidth:100 }} onClick={() => setSortValue(s => s==='name'?'value-high':s==='value-high'?'value-low':'name')}>{sortValue==='value-high'?'💰 High→Low':sortValue==='value-low'?'💰 Low→High':'🔤 A→Z'}</button>
               {canEditData && filteredAssets.length>0 && <button className="btn-secondary" style={{ padding:'10px 16px' }} onClick={selectAll}>{selectedAssets.length===filteredAssets.length?'☑ Deselect All':'☐ Select All'}</button>}
@@ -1432,8 +1433,13 @@ const AssetManager = ({ user, onLogout }) => {
 
         {/* Locations */}
         {activeTab === 'locations' && (
+          <div>
+            <div style={{ display:'flex', gap:12, marginBottom:16, alignItems:'center', flexWrap:'wrap' }}>
+              <input type="text" className="input-field" placeholder="Search locations..." style={{ maxWidth:300 }} value={locationSearch} onChange={e => setLocationSearch(e.target.value)} />
+              <span style={{ fontSize:12, color:'#64748b' }}>{locations.filter(l => !locationSearch || l.name.toLowerCase().includes(locationSearch.toLowerCase()) || (l.address||'').toLowerCase().includes(locationSearch.toLowerCase())).length} of {locations.length} locations</span>
+            </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:20 }}>
-            {locations.map(loc => { const la=assets.filter(a=>a.locationId===loc.id); const lv=la.reduce((s,a)=>s+(a.currentValue||0)*(a.quantity||1),0); return (
+            {locations.filter(l => !locationSearch || l.name.toLowerCase().includes(locationSearch.toLowerCase()) || (l.address||'').toLowerCase().includes(locationSearch.toLowerCase())).map(loc => { const la=assets.filter(a=>a.locationId===loc.id); const lv=la.reduce((s,a)=>s+(a.currentValue||0)*(a.quantity||1),0); return (
               <div key={loc.id} className="glass-card" style={{ padding:24 }}>
                 <h3 style={{ margin:'0 0 8px' }}>{loc.name}</h3>
                 <p style={{ color:'#64748b', fontSize:13, margin:'0 0 16px' }}>{loc.address||'No address'}</p>
@@ -1444,6 +1450,7 @@ const AssetManager = ({ user, onLogout }) => {
                 {isAdminRole && <div style={{ display:'flex', gap:8 }}><button className="btn-secondary" style={{ flex:1, padding:'10px 16px' }} onClick={() => setEditingLocation({...loc})}>Edit</button><button className="btn-danger" style={{ flex:1, padding:'10px 16px' }} onClick={() => handleDeleteLocation(loc.id)}>Delete</button></div>}
               </div>
             ); })}
+          </div>
           </div>
         )}
 
