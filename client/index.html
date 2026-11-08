@@ -1532,8 +1532,9 @@ const AssetManager = ({ user, onLogout }) => {
                         {children.map(c => {
                           const ca = assets.filter(a => a.locationId === c.id);
                           return <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', fontSize:13 }}>
-                            <span style={{ color:'#cbd5e1' }}>↳ {c.name}</span>
-                            <span style={{ color:'#64748b', fontSize:12 }}>{ca.length} assets</span>
+                            <span style={{ color:'#cbd5e1', flex:1 }}>↳ {c.name}</span>
+                            <span style={{ color:'#64748b', fontSize:12, marginRight:8 }}>{ca.length} assets</span>
+                            {isAdminRole && <button className="btn-secondary" style={{ padding:'3px 8px', fontSize:11 }} onClick={() => setEditingLocation({...c})}>✏️</button>}
                           </div>;
                         })}
                       </div>
