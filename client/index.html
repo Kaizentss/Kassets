@@ -1413,7 +1413,7 @@ const AssetManager = ({ user, onLogout }) => {
                       <input type="text" className="input-field" placeholder="Search locations..." autoFocus style={{ width:'100%', margin:0, fontSize:13 }} value={locDropdownSearch} onChange={e => setLocDropdownSearch(e.target.value)} onClick={e => e.stopPropagation()} />
                     </div>
                     <div style={{ maxHeight:300, overflowY:'auto' }}>
-                      <div style={{ padding:'8px 12px', cursor:'pointer', fontSize:13, background:filterLocation==='all'?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation('all'); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(filterLocation!=='all') e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(filterLocation!=='all') e.target.style.background='transparent'; }}>All Locations</div>
+                      <div style={{ padding:'10px 14px', cursor:'pointer', fontSize:15, background:filterLocation==='all'?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation('all'); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(filterLocation!=='all') e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(filterLocation!=='all') e.target.style.background='transparent'; }}>All Locations</div>
                       {(() => {
                         const search = locDropdownSearch.toLowerCase();
                         const matchesSearch = (l) => !search || l.name.toLowerCase().includes(search);
@@ -1426,19 +1426,19 @@ const AssetManager = ({ user, onLogout }) => {
                           const expanded = locExpanded[p.id] || !!search;
                           const filteredChildren = children.filter(matchesSearch);
                           return <React.Fragment key={p.id}>
-                            <div style={{ padding:'8px 12px', cursor:'pointer', fontSize:13, background:isSelected?'rgba(59,130,246,0.2)':'transparent', display:'flex', alignItems:'center', gap:6 }}>
+                            <div style={{ padding:'10px 14px', cursor:'pointer', fontSize:15, background:isSelected?'rgba(59,130,246,0.2)':'transparent', display:'flex', alignItems:'center', gap:6 }}>
                               {hasChildren && <span style={{ cursor:'pointer', fontSize:10, width:16, textAlign:'center', flexShrink:0 }} onClick={e => { e.stopPropagation(); setLocExpanded(prev => ({...prev, [p.id]:!prev[p.id]})); }}>{expanded ? '▼' : '▶'}</span>}
                               {!hasChildren && <span style={{ width:16, flexShrink:0 }} />}
                               <span style={{ flex:1 }} onClick={() => { setFilterLocation(String(p.id)); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(!isSelected) e.target.parentElement.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(!isSelected) e.target.parentElement.style.background='transparent'; }}>{p.name}</span>
                             </div>
                             {expanded && filteredChildren.map(c => {
                               const cSelected = filterLocation === String(c.id);
-                              return <div key={c.id} style={{ padding:'6px 12px 6px 40px', cursor:'pointer', fontSize:12, color:'#94a3b8', background:cSelected?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation(String(c.id)); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(!cSelected) e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(!cSelected) e.target.style.background='transparent'; }}>↳ {c.name}</div>;
+                              return <div key={c.id} style={{ padding:'8px 14px 8px 44px', cursor:'pointer', fontSize:14, color:'#94a3b8', background:cSelected?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation(String(c.id)); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(!cSelected) e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(!cSelected) e.target.style.background='transparent'; }}>↳ {c.name}</div>;
                             })}
                           </React.Fragment>;
                         }), ...standaloneChildren.map(c => {
                           const cSelected = filterLocation === String(c.id);
-                          return <div key={c.id} style={{ padding:'6px 12px 6px 40px', cursor:'pointer', fontSize:12, color:'#94a3b8', background:cSelected?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation(String(c.id)); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(!cSelected) e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(!cSelected) e.target.style.background='transparent'; }}>↳ {c.name}</div>;
+                          return <div key={c.id} style={{ padding:'8px 14px 8px 44px', cursor:'pointer', fontSize:14, color:'#94a3b8', background:cSelected?'rgba(59,130,246,0.2)':'transparent' }} onClick={() => { setFilterLocation(String(c.id)); setLocDropdownOpen(false); setSelectedAssets([]); }} onMouseEnter={e => { if(!cSelected) e.target.style.background='rgba(255,255,255,0.05)'; }} onMouseLeave={e => { if(!cSelected) e.target.style.background='transparent'; }}>↳ {c.name}</div>;
                         })];
                       })()}
                     </div>
