@@ -925,7 +925,7 @@ const AssetManager = ({ user, onLogout }) => {
       mapped.photos = uploadedPhotos.map(p => ({ id:p.id, asset_id:p.asset_id, name:p.name }));
       mapped.thumbnailPhotoId = uploadedPhotos.length > 0 ? uploadedPhotos[0].id : null;
       setAssets(prev => [...prev, mapped]);
-      setShowAddAsset(false); setNewAsset({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] });
+      setShowAddAsset(false); setNewAsset(prev => ({ name:'', category:prev.category, purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:prev.locationId, description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] }));
     } catch (e) { alert(e.message); }
     setLoadingAction('');
   };
