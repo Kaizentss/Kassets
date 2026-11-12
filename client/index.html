@@ -1683,22 +1683,43 @@ const AssetManager = ({ user, onLogout }) => {
                 </div>
               )}
               {(newAsset.photos?.length||0) < 5 && (
-                <input type="file" accept="image/*" multiple onChange={e => {
-                  const files = Array.from(e.target.files);
-                  const max = 5 - (newAsset.photos?.length||0);
-                  const toAdd = files.slice(0, max);
-                  if(files.length > max) alert(`Only adding ${max} photo(s). Max 5.`);
-                  toAdd.forEach(f => {
-                    const r = new FileReader();
-                    r.onload = async () => {
-                      let photoUrl = r.result;
-                      if (compressPhotos) { photoUrl = await compressImage(photoUrl, 600, 0.4); }
-                      setNewAsset(prev => ({...prev, photos: [...(prev.photos||[]), {url:photoUrl, name:f.name}]}));
-                    };
-                    r.readAsDataURL(f);
-                  });
-                  e.target.value='';
-                }} style={{ fontSize:12 }} />
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                  <label className="btn-secondary" style={{ padding:'8px 14px', fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4 }}>
+                    📁 Choose Photos
+                    <input type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e => {
+                      const files = Array.from(e.target.files);
+                      const max = 5 - (newAsset.photos?.length||0);
+                      const toAdd = files.slice(0, max);
+                      if(files.length > max) alert(`Only adding ${max} photo(s). Max 5.`);
+                      toAdd.forEach(f => {
+                        const r = new FileReader();
+                        r.onload = async () => {
+                          let photoUrl = r.result;
+                          if (compressPhotos) { photoUrl = await compressImage(photoUrl, 600, 0.4); }
+                          setNewAsset(prev => ({...prev, photos: [...(prev.photos||[]), {url:photoUrl, name:f.name}]}));
+                        };
+                        r.readAsDataURL(f);
+                      });
+                      e.target.value='';
+                    }} />
+                  </label>
+                  <label className="btn-secondary" style={{ padding:'8px 14px', fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4 }}>
+                    📷 Take Photo
+                    <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => {
+                      const files = Array.from(e.target.files);
+                      if(!files.length) return;
+                      const f = files[0];
+                      const r = new FileReader();
+                      r.onload = async () => {
+                        let photoUrl = r.result;
+                        if (compressPhotos) { photoUrl = await compressImage(photoUrl, 600, 0.4); }
+                        setNewAsset(prev => ({...prev, photos: [...(prev.photos||[]), {url:photoUrl, name:f.name}]}));
+                      };
+                      r.readAsDataURL(f);
+                      e.target.value='';
+                    }} />
+                  </label>
+                </div>
               )}
             </div>
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
@@ -1748,7 +1769,18 @@ const AssetManager = ({ user, onLogout }) => {
                   {isAdminRole && <button onClick={() => handleDeletePhoto(editingAsset.id, p.id)} style={{ position:'absolute', top:-6, right:-6, background:'#ef4444', border:'none', borderRadius:'50%', width:20, height:20, color:'white', fontSize:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>}
                 </div>
               ))}</div>}
-              {(editingAsset.photos?.length||0)<5 && <input type="file" accept="image/*" multiple onChange={e => handlePhotoUpload(e, editingAsset.id)} style={{ fontSize:12 }} />}
+              {(editingAsset.photos?.length||0)<5 && (
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                  <label className="btn-secondary" style={{ padding:'8px 14px', fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4 }}>
+                    📁 Choose Photos
+                    <input type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e => handlePhotoUpload(e, editingAsset.id)} />
+                  </label>
+                  <label className="btn-secondary" style={{ padding:'8px 14px', fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4 }}>
+                    📷 Take Photo
+                    <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => handlePhotoUpload(e, editingAsset.id)} />
+                  </label>
+                </div>
+              )}
             </div>
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
               <button className="btn-secondary" onClick={() => setEditingAsset(null)}>Cancel</button>
