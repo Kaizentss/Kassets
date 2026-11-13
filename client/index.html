@@ -809,8 +809,10 @@ const AssetManager = ({ user, onLogout }) => {
   const [visibleCount, setVisibleCount] = useState(50);
 
   // Map server asset to frontend format
-  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:parseFloat(x.purchase_cost??x.purchaseCost)|| 0, currentValue:parseFloat(x.current_value??x.currentValue)||0, quantity:parseInt(x.quantity)>=0?parseInt(x.quantity):1, depreciationRate:parseFloat(x.depreciation_rate??x.depreciationRate)||10, locationId:x.location_id!=null?parseInt(x.location_id):(x.locationId!=null?parseInt(x.locationId):null), photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId??null, notes:x.notes||[] });
-  const [newAsset, setNewAsset] = useState({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] });
+  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:parseFloat(x.purchase_cost??x.purchaseCost)|| 0, currentValue:parseFloat(x.current_value??x.currentValue)||0, quantity:parseInt(x.quantity)>=0?parseInt(x.quantity):1, depreciationRate:parseFloat(x.depreciation_rate??x.depreciationRate)||10, locationId:x.location_id!=null?parseInt(x.location_id):(x.locationId!=null?parseInt(x.locationId):null), photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId??null, notes:x.notes||[], qrCode:x.qr_code||x.qrCode||'' });
+  const [newAsset, setNewAsset] = useState({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[], qrCode:'' });
+  const [showQrGenerator, setShowQrGenerator] = useState(false);
+  const [qrGenerating, setQrGenerating] = useState(false);
   const [newLocation, setNewLocation] = useState({ name:'', address:'', parentId:'' });
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwData, setPwData] = useState({ current:'', new:'', confirm:'' });
@@ -898,7 +900,7 @@ const AssetManager = ({ user, onLogout }) => {
     const ml = filterLocation==='all' || getLocationAndChildren(filterLocation).includes(a.locationId);
     const mc = filterCategory==='all' || a.category===filterCategory;
     const st = searchTerm.toLowerCase();
-    const ms = !st || a.name.toLowerCase().includes(st) || a.category?.toLowerCase().includes(st) || a.serialNumber?.toLowerCase().includes(st) || a.partNumber?.toLowerCase().includes(st) || a.description?.toLowerCase().includes(st) || (a.notes||[]).some(n => n.text?.toLowerCase().includes(st));
+    const ms = !st || a.name.toLowerCase().includes(st) || a.category?.toLowerCase().includes(st) || a.serialNumber?.toLowerCase().includes(st) || a.partNumber?.toLowerCase().includes(st) || a.description?.toLowerCase().includes(st) || a.qrCode?.toLowerCase().includes(st) || (a.notes||[]).some(n => n.text?.toLowerCase().includes(st));
     return ml && mc && ms;
   }).sort((a,b) => {
     if (sortValue === 'value-high') return (b.currentValue*b.quantity) - (a.currentValue*a.quantity);
@@ -925,7 +927,7 @@ const AssetManager = ({ user, onLogout }) => {
       mapped.photos = uploadedPhotos.map(p => ({ id:p.id, asset_id:p.asset_id, name:p.name }));
       mapped.thumbnailPhotoId = uploadedPhotos.length > 0 ? uploadedPhotos[0].id : null;
       setAssets(prev => [...prev, mapped]);
-      setShowAddAsset(false); setNewAsset(prev => ({ name:'', category:prev.category, purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:prev.locationId, description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[] }));
+      setShowAddAsset(false); setNewAsset(prev => ({ name:'', category:prev.category, purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:prev.locationId, description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[], qrCode:'' }));
     } catch (e) { alert(e.message); }
     setLoadingAction('');
   };
@@ -944,7 +946,7 @@ const AssetManager = ({ user, onLogout }) => {
       if (orig && parseInt(editingAsset.locationId) !== parseInt(orig.locationId)) {
         notes.push(`📍 MOVED: ${getLocationName(parseInt(orig.locationId))} → ${getLocationName(parseInt(editingAsset.locationId))} by ${un} on ${ts}`);
       }
-      await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId }) });
+      await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId, qrCode:editingAsset.qrCode }) });
       const addedNotes = [];
       for (const n of notes) { const nn = await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); addedNotes.push(nn); }
       // Update state directly with editing values (parse numbers to avoid string types)
@@ -1654,6 +1656,13 @@ const AssetManager = ({ user, onLogout }) => {
               <input className="input-field" placeholder="Part Number" value={newAsset.partNumber} onChange={e => setNewAsset({...newAsset, partNumber:e.target.value})} />
             </div>
             <div style={{ marginBottom:12 }}>
+              <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>🏷️ QR Code</label>
+              <div style={{ display:'flex', gap:8 }}>
+                <input className="input-field" placeholder="Scan or type QR code" value={newAsset.qrCode} onChange={e => setNewAsset({...newAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                {newAsset.qrCode && <a href={'/qr/'+newAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
+              </div>
+            </div>
+            <div style={{ marginBottom:12 }}>
               <div style={{ display:'flex', gap:4, marginBottom:4 }}>
                 <button type="button" title="Bold" style={{ padding:'3px 10px', fontSize:13, fontWeight:700, background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('addDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=newAsset.description; if(s===e){setNewAsset({...newAsset,description:v+'****'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,s+2)},0)} else {setNewAsset({...newAsset,description:v.slice(0,s)+'**'+v.slice(s,e)+'**'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+2,e+2)},0)} }}>B</button>
                 <button type="button" title="Italic" style={{ padding:'3px 10px', fontSize:13, fontStyle:'italic', background:'rgba(148,163,184,0.15)', border:'1px solid rgba(148,163,184,0.2)', borderRadius:6, color:'#e2e8f0', cursor:'pointer' }} onClick={() => { const ta=document.getElementById('addDesc'); if(!ta)return; const s=ta.selectionStart,e=ta.selectionEnd,v=newAsset.description; if(s===e){setNewAsset({...newAsset,description:v+'__'}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,s+1)},0)} else {setNewAsset({...newAsset,description:v.slice(0,s)+'_'+v.slice(s,e)+'_'+v.slice(e)}); setTimeout(()=>{ta.focus();ta.setSelectionRange(s+1,e+1)},0)} }}>I</button>
@@ -1743,6 +1752,13 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               <input className="input-field" placeholder="Serial Number" value={editingAsset.serialNumber||''} onChange={e => setEditingAsset({...editingAsset, serialNumber:e.target.value})} />
               <input className="input-field" placeholder="Part Number" value={editingAsset.partNumber||''} onChange={e => setEditingAsset({...editingAsset, partNumber:e.target.value})} />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>🏷️ QR Code</label>
+              <div style={{ display:'flex', gap:8 }}>
+                <input className="input-field" placeholder="Scan or type QR code" value={editingAsset.qrCode||''} onChange={e => setEditingAsset({...editingAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                {editingAsset.qrCode && <a href={'/qr/'+editingAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
+              </div>
             </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ display:'flex', gap:4, marginBottom:4 }}>
@@ -1887,10 +1903,59 @@ const AssetManager = ({ user, onLogout }) => {
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddLocation(true); }}>📍 Add Location</button>}
               {canEditData && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center' }} onClick={() => { setShowSettings(false); setShowAddAsset(true); }}>➕ Add Asset</button>}
               {isAdminRole && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', background:'rgba(239,68,68,0.1)', borderColor:'rgba(239,68,68,0.3)' }} onClick={() => { setShowSettings(false); loadAuditLog(); }}>🔍 Deletion Log</button>}
+              {isAdminRole && <button className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', background:'rgba(139,92,246,0.1)', borderColor:'rgba(139,92,246,0.3)' }} onClick={() => { setShowSettings(false); setShowQrGenerator(true); }}>🏷️ QR Codes</button>}
               {isAdminRole && <label className="btn-secondary" style={{ padding:'12px 16px', fontSize:13, display:'flex', alignItems:'center', gap:8, justifyContent:'center', cursor:'pointer', background:'rgba(34,197,94,0.1)', borderColor:'rgba(34,197,94,0.3)' }}><input type="file" accept=".xlsx,.xls" style={{ display:'none' }} onChange={e => { if(e.target.files[0]){ setShowSettings(false); parseKeylistExcel(e.target.files[0]); } }} />📥 Import Keylist</label>}
             </div>
 
             <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}><button className="btn-secondary" onClick={() => setShowSettings(false)}>Cancel</button><button className="btn-primary" onClick={handleSaveSettings}>Save</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Generator */}
+      {showQrGenerator && (
+        <div className="modal-overlay" onClick={() => setShowQrGenerator(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:500 }}>
+            <h2 style={{ marginBottom:8 }}>🏷️ QR Code Generator</h2>
+            <p style={{ color:'#64748b', fontSize:13, marginBottom:20 }}>Generate unique QR codes for your 2×1" label printer. Each code links to kassets.app/qr/CODE</p>
+
+            <label style={{ display:'block', marginBottom:8, fontSize:14, color:'#94a3b8' }}>How many labels?</label>
+            <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+              {[1,5,10,25,50,100].map(n => (
+                <button key={n} className="btn-secondary" style={{ padding:'12px 20px', fontSize:15, flex:'1 1 auto', minWidth:60 }} disabled={qrGenerating} onClick={async () => {
+                  setQrGenerating(true);
+                  try {
+                    const r = await api('/qr/generate', { method:'POST', body:JSON.stringify({ count:n }) });
+                    if (!r.codes?.length) { alert('No codes generated'); setQrGenerating(false); return; }
+                    const printWin = window.open('', '_blank');
+                    const baseUrl = window.location.origin + '/qr/';
+                    let labelsHtml = '';
+                    for (const code of r.codes) {
+                      const qrUrl = baseUrl + code;
+                      const qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qrUrl);
+                      labelsHtml += '<div class="label"><img src="' + qrImgUrl + '" /><div class="info"><div class="code">' + code + '</div><div class="url">kassets.app/qr/' + code + '</div></div></div>';
+                    }
+                    printWin.document.write('<!DOCTYPE html><html><head><title>Kassets QR Labels</title><style>' +
+                      '@page{size:2in 1in;margin:0}' +
+                      '*{box-sizing:border-box;margin:0;padding:0}' +
+                      'body{font-family:-apple-system,sans-serif}' +
+                      '.label{width:2in;height:1in;display:flex;align-items:center;padding:0.05in 0.1in;page-break-after:always;gap:0.08in}' +
+                      '.label img{width:0.85in;height:0.85in}' +
+                      '.info{display:flex;flex-direction:column;justify-content:center;flex:1}' +
+                      '.code{font-size:9pt;font-weight:700;letter-spacing:0.5px}' +
+                      '.url{font-size:6pt;color:#666;margin-top:2px}' +
+                      '</style></head><body>' + labelsHtml + '</body></html>');
+                    printWin.document.close();
+                    alert(n + ' QR code(s) generated! Print window opened.');
+                  } catch(e) { alert(e.message); }
+                  setQrGenerating(false);
+                }}>{qrGenerating ? '...' : n}</button>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setShowQrGenerator(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}

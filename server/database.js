@@ -733,6 +733,51 @@ module.exports = {
     }
   },
 
+  // ========== QR CODES ==========
+  generateQrCodes: (companyId, count) => {
+    const cData = loadCompanyData(companyId);
+    if (!cData.qr_codes) cData.qr_codes = [];
+    const codes = [];
+    for (let i = 0; i < count; i++) {
+      // Generate unique 8-char alphanumeric code
+      let code;
+      do {
+        code = 'K' + Date.now().toString(36).slice(-4).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+      } while (cData.qr_codes.find(q => q.code === code));
+      const qr = { code, created_at: new Date().toISOString(), assigned_asset_id: null };
+      cData.qr_codes.push(qr);
+      codes.push(code);
+    }
+    saveCompanyData(companyId);
+    return codes;
+  },
+
+  getQrCodes: (companyId) => {
+    const cData = loadCompanyData(companyId);
+    return (cData.qr_codes || []).map(q => ({
+      ...q,
+      asset_name: q.assigned_asset_id ? (cData.assets.find(a => a.id === q.assigned_asset_id)?.name || null) : null
+    }));
+  },
+
+  getAssetByQrCode: (qrCode) => {
+    for (const company of platform.companies) {
+      const cData = loadCompanyData(company.id);
+      // Find the asset with this qr_code
+      const asset = cData.assets.find(a => a.qr_code === qrCode);
+      if (asset) {
+        const photoMetas = cData.photos.filter(p => p.asset_id === asset.id);
+        return {
+          ...asset,
+          location_name: cData.locations.find(l => l.id === asset.location_id)?.name || 'Unknown',
+          photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
+          thumbnailPhotoId: photoMetas.length > 0 ? photoMetas[0].id : null
+        };
+      }
+    }
+    return null;
+  },
+
   // ========== AUDIT LOG ==========
   addAuditLog: (companyId, action, itemType, itemName, deletedBy) => {
     const cData = loadCompanyData(companyId);

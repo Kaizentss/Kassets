@@ -519,7 +519,7 @@ module.exports = (db) => {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode } = req.body;
       if (!name || !sanitizeStr(name).length) return res.status(400).json({ error: 'Asset name required' });
       const asset = db.createAsset({
         company_id: companyId,
@@ -533,7 +533,8 @@ module.exports = (db) => {
         current_value: sanitizeNum(currentValue) || sanitizeNum(purchaseCost),
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: sanitizeNum(depreciationRate, 10),
-        location_id: locationId ? parseInt(locationId) : null
+        location_id: locationId ? parseInt(locationId) : null,
+        qr_code: sanitizeStr(qrCode || '', 50)
       });
       const full = db.getAsset(asset.id);
       res.json(full || { id: asset.id });
@@ -544,7 +545,7 @@ module.exports = (db) => {
 
   router.put('/assets/:id', auth, canEdit, (req, res) => {
     try {
-      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId } = req.body;
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode } = req.body;
       db.updateAsset(parseInt(req.params.id), {
         name: sanitizeStr(name, 200),
         category: sanitizeStr(category, 100),
@@ -556,7 +557,8 @@ module.exports = (db) => {
         current_value: sanitizeNum(currentValue),
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: sanitizeNum(depreciationRate, 10),
-        location_id: locationId ? parseInt(locationId) : null
+        location_id: locationId ? parseInt(locationId) : null,
+        qr_code: sanitizeStr(qrCode || '', 50)
       });
       res.json({ message: 'Updated' });
     } catch (e) {
@@ -821,6 +823,69 @@ module.exports = (db) => {
   });
 
   // ========== IMPORT LEGACY DATABASE (Super Admin only) ==========
+  // ========== QR CODES ==========
+  // Generate unique QR codes (returns array of unique IDs)
+  router.post('/qr/generate', auth, isAdmin, (req, res) => {
+    try {
+      const count = Math.min(parseInt(req.body.count) || 1, 100);
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: 'Company context required' });
+      const codes = db.generateQrCodes(companyId, count);
+      res.json({ codes });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Get all generated QR codes for the company
+  router.get('/qr/codes', auth, (req, res) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.json([]);
+      res.json(db.getQrCodes(companyId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Public asset view by QR code (NO auth required — this is what the QR code links to)
+  router.get('/public/asset/:qrCode', (req, res) => {
+    try {
+      const asset = db.getAssetByQrCode(req.params.qrCode);
+      if (!asset) return res.status(404).json({ error: 'Asset not found' });
+      // Return limited public info (no internal notes, no values)
+      res.json({
+        name: asset.name,
+        category: asset.category,
+        serialNumber: asset.serial_number,
+        partNumber: asset.part_number,
+        description: asset.description,
+        quantity: asset.quantity,
+        locationName: asset.location_name,
+        qrCode: asset.qr_code,
+        photos: (asset.photos || []).map(p => ({ id: p.id, name: p.name })),
+        thumbnailPhotoId: asset.thumbnailPhotoId
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Public photo access (for QR code scanned assets)
+  router.get('/public/photo/:id', (req, res) => {
+    try {
+      const photo = db.getPhotoDataById(parseInt(req.params.id));
+      if (!photo || !photo.url) return res.status(404).send('Not found');
+      const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return res.status(400).send('Invalid');
+      const buffer = Buffer.from(match[2], 'base64');
+      res.set({ 'Content-Type': match[1], 'Cache-Control': 'public, max-age=86400' });
+      res.send(buffer);
+    } catch (e) {
+      res.status(500).send('Error');
+    }
+  });
+
   router.post('/import-legacy', auth, isSuperAdmin, (req, res) => {
     try {
       const { legacyData, companyName, masterAdmin } = req.body;
