@@ -1471,7 +1471,10 @@ const AssetManager = ({ user, onLogout }) => {
         {activeTab === 'assets' && (
           <div>
             <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
-              <input type="text" className="input-field" placeholder="Search assets..." style={{ maxWidth:250 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <div style={{ display:'flex', gap:0, maxWidth:300, flex:1 }}>
+                <input type="text" className="input-field" placeholder="Search assets..." style={{ borderTopRightRadius:0, borderBottomRightRadius:0, flex:1 }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <button type="button" className="btn-secondary" style={{ borderTopLeftRadius:0, borderBottomLeftRadius:0, borderLeft:'none', padding:'8px 12px', fontSize:15 }} onClick={() => setQrScanTarget('search')}>📷</button>
+              </div>
               <div data-loc-dropdown style={{ position:'relative', minWidth:200, maxWidth:280 }}>
                 <div className="input-field" style={{ cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }} onClick={() => { setLocDropdownOpen(!locDropdownOpen); setLocDropdownSearch(''); }}>
                   <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{filterLocation==='all' ? 'All Locations' : getLocationName(parseInt(filterLocation))}</span>
@@ -2238,6 +2241,7 @@ const AssetManager = ({ user, onLogout }) => {
       {qrScanTarget && <QrScanner onScan={(code) => {
         if (qrScanTarget === 'add') setNewAsset(prev => ({...prev, qrCode: code}));
         else if (qrScanTarget === 'edit') setEditingAsset(prev => ({...prev, qrCode: code}));
+        else if (qrScanTarget === 'search') { setSearchTerm(code); setFilterLocation('all'); setFilterCategory('all'); }
         setQrScanTarget(null);
       }} onClose={() => setQrScanTarget(null)} />}
 
