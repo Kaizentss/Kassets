@@ -123,6 +123,77 @@ const thumbUrl = (photoId) => {
 const roleColors = { super_admin: 'role-super', master_admin: 'role-master', admin: 'role-admin', editor: 'role-editor', viewer: 'role-viewer' };
 const roleLabels = { super_admin: 'SUPER ADMIN', master_admin: 'MASTER ADMIN', admin: 'ADMIN', editor: 'EDITOR', viewer: 'VIEWER' };
 const formatCurrency = (amt) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amt || 0);
+
+// QR Scanner component — opens camera, scans in real-time, returns code
+const QrScanner = ({ onScan, onClose }) => {
+  const videoRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const [error, setError] = React.useState('');
+  const [scanning, setScanning] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        // Start scanning loop
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const hasBarcodeDetector = typeof BarcodeDetector !== 'undefined';
+        let detector = null;
+        if (hasBarcodeDetector) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch(e) {} }
+
+        const scan = async () => {
+          if (cancelled || !videoRef.current || videoRef.current.readyState < 2) { if (!cancelled) requestAnimationFrame(scan); return; }
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          ctx.drawImage(videoRef.current, 0, 0);
+
+          if (detector) {
+            try {
+              const barcodes = await detector.detect(canvas);
+              if (barcodes.length > 0) {
+                let val = barcodes[0].rawValue;
+                // Extract code from URL if it's a kassets URL
+                const match = val.match(/\/qr\/([A-Z0-9]+)$/i);
+                if (match) val = match[1];
+                stream.getTracks().forEach(t => t.stop());
+                onScan(val);
+                return;
+              }
+            } catch(e) {}
+          }
+          if (!cancelled) requestAnimationFrame(scan);
+        };
+
+        if (detector) {
+          requestAnimationFrame(scan);
+        } else {
+          setError('QR scanning not supported on this browser. Type the code manually.');
+        }
+      } catch(e) {
+        setError('Camera access denied. Please allow camera permissions.');
+      }
+    };
+    startCamera();
+    return () => { cancelled = true; if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  return React.createElement('div', { style: { position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:2000, background:'#000', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' } },
+    React.createElement('div', { style: { position:'absolute', top:16, right:16, zIndex:2001 } },
+      React.createElement('button', { onClick: () => { if(streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); onClose(); }, style: { background:'rgba(255,255,255,0.2)', border:'none', color:'white', fontSize:24, width:44, height:44, borderRadius:22, cursor:'pointer' } }, '✕')
+    ),
+    React.createElement('div', { style: { position:'absolute', top:16, left:16, zIndex:2001, color:'white', fontSize:14, fontWeight:600 } }, '📷 Scan QR Code'),
+    error ? React.createElement('p', { style: { color:'#f87171', padding:20, textAlign:'center' } }, error)
+    : React.createElement('div', { style: { position:'relative', width:'100%', maxWidth:500 } },
+        React.createElement('video', { ref: videoRef, style: { width:'100%', borderRadius:12 }, playsInline: true, muted: true }),
+        React.createElement('div', { style: { position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:200, height:200, border:'3px solid #ffd700', borderRadius:16, boxShadow:'0 0 0 9999px rgba(0,0,0,0.5)' } })
+      )
+  );
+};
 const sanitizeForHTML = (text) => {
   if (!text) return '';
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -813,6 +884,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [newAsset, setNewAsset] = useState({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[], qrCode:'' });
   const [showQrGenerator, setShowQrGenerator] = useState(false);
   const [qrGenerating, setQrGenerating] = useState(false);
+  const [qrScanTarget, setQrScanTarget] = useState(null); // 'add' or 'edit'
   const [newLocation, setNewLocation] = useState({ name:'', address:'', parentId:'' });
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwData, setPwData] = useState({ current:'', new:'', confirm:'' });
@@ -1658,7 +1730,8 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ marginBottom:12 }}>
               <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>🏷️ QR Code</label>
               <div style={{ display:'flex', gap:8 }}>
-                <input className="input-field" placeholder="Scan or type QR code" value={newAsset.qrCode} onChange={e => setNewAsset({...newAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                <input className="input-field" placeholder="Type or scan QR code" value={newAsset.qrCode} onChange={e => setNewAsset({...newAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                <button type="button" className="btn-secondary" style={{ padding:'8px 14px', fontSize:13, display:'flex', alignItems:'center', gap:4 }} onClick={() => setQrScanTarget('add')}>📷 Scan</button>
                 {newAsset.qrCode && <a href={'/qr/'+newAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
               </div>
             </div>
@@ -1756,7 +1829,8 @@ const AssetManager = ({ user, onLogout }) => {
             <div style={{ marginBottom:12 }}>
               <label style={{ display:'block', marginBottom:4, fontSize:12, color:'#94a3b8' }}>🏷️ QR Code</label>
               <div style={{ display:'flex', gap:8 }}>
-                <input className="input-field" placeholder="Scan or type QR code" value={editingAsset.qrCode||''} onChange={e => setEditingAsset({...editingAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                <input className="input-field" placeholder="Type or scan QR code" value={editingAsset.qrCode||''} onChange={e => setEditingAsset({...editingAsset, qrCode:e.target.value})} style={{ flex:1 }} />
+                <button type="button" className="btn-secondary" style={{ padding:'8px 14px', fontSize:13, display:'flex', alignItems:'center', gap:4 }} onClick={() => setQrScanTarget('edit')}>📷 Scan</button>
                 {editingAsset.qrCode && <a href={'/qr/'+editingAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
               </div>
             </div>
@@ -2148,6 +2222,13 @@ const AssetManager = ({ user, onLogout }) => {
       )}
 
       {/* Loading Overlay */}
+      {/* QR Scanner Overlay */}
+      {qrScanTarget && <QrScanner onScan={(code) => {
+        if (qrScanTarget === 'add') setNewAsset(prev => ({...prev, qrCode: code}));
+        else if (qrScanTarget === 'edit') setEditingAsset(prev => ({...prev, qrCode: code}));
+        setQrScanTarget(null);
+      }} onClose={() => setQrScanTarget(null)} />}
+
       {loadingAction && (
         <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
           <div style={{ background:'rgba(30,41,59,0.95)', borderRadius:16, padding:'24px 40px', textAlign:'center', border:'1px solid rgba(148,163,184,0.2)' }}>
