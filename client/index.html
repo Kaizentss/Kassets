@@ -876,7 +876,7 @@ const AssetManager = ({ user, onLogout }) => {
   const [visibleCount, setVisibleCount] = useState(50);
 
   // Map server asset to frontend format
-  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:parseFloat(x.purchase_cost??x.purchaseCost)|| 0, currentValue:parseFloat(x.current_value??x.currentValue)||0, quantity:parseInt(x.quantity)>=0?parseInt(x.quantity):1, depreciationRate:parseFloat(x.depreciation_rate??x.depreciationRate)||10, locationId:x.location_id!=null?parseInt(x.location_id):(x.locationId!=null?parseInt(x.locationId):null), photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId??null, notes:x.notes||[], qrCode:x.qr_code||x.qrCode||'' });
+  const mapAsset = (x) => ({ id:x.id, name:x.name, category:x.category, serialNumber:x.serial_number||x.serialNumber||'', partNumber:x.part_number||x.partNumber||'', description:x.description||'', purchaseDate:x.purchase_date||x.purchaseDate||'', purchaseCost:parseFloat(x.purchase_cost??x.purchaseCost)|| 0, currentValue:parseFloat(x.current_value??x.currentValue)||0, quantity:parseInt(x.quantity)>=0?parseInt(x.quantity):1, depreciationRate:parseFloat(x.depreciation_rate??x.depreciationRate)||10, locationId:x.location_id!=null?parseInt(x.location_id):(x.locationId!=null?parseInt(x.locationId):null), photos:x.photos||[], thumbnailPhotoId:x.thumbnailPhotoId??null, notes:x.notes||[], qrCode:x.qr_code||x.qrCode||'', qrPublic:x.qr_public||x.qrPublic||false });
   const [newAsset, setNewAsset] = useState({ name:'', category:'', purchaseDate:'', purchaseCost:0, currentValue:0, quantity:1, locationId:'', description:'', serialNumber:'', partNumber:'', depreciationRate:10, photos:[], qrCode:'' });
   const [showQrGenerator, setShowQrGenerator] = useState(false);
   const [qrGenerating, setQrGenerating] = useState(false);
@@ -1014,7 +1014,7 @@ const AssetManager = ({ user, onLogout }) => {
       if (orig && parseInt(editingAsset.locationId) !== parseInt(orig.locationId)) {
         notes.push(`📍 MOVED: ${getLocationName(parseInt(orig.locationId))} → ${getLocationName(parseInt(editingAsset.locationId))} by ${un} on ${ts}`);
       }
-      await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId, qrCode:editingAsset.qrCode }) });
+      await api('/assets/'+editingAsset.id, { method:'PUT', body:JSON.stringify({ name:editingAsset.name, category:editingAsset.category, serialNumber:editingAsset.serialNumber, partNumber:editingAsset.partNumber, description:editingAsset.description, purchaseDate:editingAsset.purchaseDate, purchaseCost:editingAsset.purchaseCost, currentValue:editingAsset.currentValue, quantity:editingAsset.quantity, depreciationRate:editingAsset.depreciationRate, locationId:editingAsset.locationId, qrCode:editingAsset.qrCode, qrPublic:editingAsset.qrPublic }) });
       const addedNotes = [];
       for (const n of notes) { const nn = await api('/assets/'+editingAsset.id+'/notes', { method:'POST', body:JSON.stringify({text:n}) }); addedNotes.push(nn); }
       // Update state directly with editing values (parse numbers to avoid string types)
@@ -1837,6 +1837,14 @@ const AssetManager = ({ user, onLogout }) => {
                 }}>🖨️ Print</button>}
                 {editingAsset.qrCode && <a href={'/qr/'+editingAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
               </div>
+              {isAdminRole && editingAsset.qrCode && (
+                <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, cursor:'pointer', fontSize:13, color: editingAsset.qrPublic ? '#34d399' : '#f87171' }}>
+                  <div onClick={() => setEditingAsset({...editingAsset, qrPublic:!editingAsset.qrPublic})} style={{ width:40, height:22, borderRadius:11, background:editingAsset.qrPublic?'#34d399':'#475569', position:'relative', cursor:'pointer', transition:'all 0.2s' }}>
+                    <div style={{ width:18, height:18, borderRadius:9, background:'white', position:'absolute', top:2, left:editingAsset.qrPublic?20:2, transition:'all 0.2s' }} />
+                  </div>
+                  {editingAsset.qrPublic ? '🔓 Unlocked — no PIN needed when scanned' : '🔒 Locked — PIN required when scanned'}
+                </label>
+              )}
             </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ display:'flex', gap:4, marginBottom:4 }}>

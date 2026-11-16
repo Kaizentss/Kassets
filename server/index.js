@@ -40,8 +40,8 @@ app.get('/qr/:code', (req, res) => {
     return res.status(404).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asset Not Found</title><style>body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}div{text-align:center;padding:40px}h1{color:#ffd700;margin-bottom:16px}p{color:#94a3b8}</style></head><body><div><h1>\u{1FA99} Kassets</h1><p>This QR code is not assigned to any asset.</p><p style="margin-top:20px;font-size:13px">Code: ${req.params.code}</p></div></body></html>`);
   }
 
-  const companyUsers = db.getUsers(asset.company_id);
-  const pinRequired = companyUsers.some(u => u.qr_pin);
+  // PIN required unless admin has explicitly unlocked this asset
+  const pinRequired = !asset.qr_public;
   const qrCode = req.params.code;
   const photosHtml = (asset.photos || []).map(p => `<img src="/api/public/photo/${p.id}" style="width:100%;max-width:400px;border-radius:12px;margin-bottom:12px" />`).join('');
   const esc = (s) => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

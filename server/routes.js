@@ -525,7 +525,7 @@ module.exports = (db) => {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode } = req.body;
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode, qrPublic } = req.body;
       if (!name || !sanitizeStr(name).length) return res.status(400).json({ error: 'Asset name required' });
       const asset = db.createAsset({
         company_id: companyId,
@@ -540,7 +540,8 @@ module.exports = (db) => {
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: sanitizeNum(depreciationRate, 10),
         location_id: locationId ? parseInt(locationId) : null,
-        qr_code: sanitizeStr(qrCode || '', 50)
+        qr_code: sanitizeStr(qrCode || '', 50),
+        qr_public: qrPublic ? true : false
       });
       const full = db.getAsset(asset.id);
       res.json(full || { id: asset.id });
@@ -551,7 +552,7 @@ module.exports = (db) => {
 
   router.put('/assets/:id', auth, canEdit, (req, res) => {
     try {
-      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode } = req.body;
+      const { name, category, serialNumber, partNumber, description, purchaseDate, purchaseCost, currentValue, quantity, depreciationRate, locationId, qrCode, qrPublic } = req.body;
       db.updateAsset(parseInt(req.params.id), {
         name: sanitizeStr(name, 200),
         category: sanitizeStr(category, 100),
@@ -564,7 +565,8 @@ module.exports = (db) => {
         quantity: parseInt(quantity) >= 0 ? parseInt(quantity) : 1,
         depreciation_rate: sanitizeNum(depreciationRate, 10),
         location_id: locationId ? parseInt(locationId) : null,
-        qr_code: sanitizeStr(qrCode || '', 50)
+        qr_code: sanitizeStr(qrCode || '', 50),
+        qr_public: qrPublic ? true : false
       });
       res.json({ message: 'Updated' });
     } catch (e) {
@@ -861,11 +863,10 @@ module.exports = (db) => {
       if (!qrCode || !pin) return res.status(400).json({ error: 'QR code and PIN required' });
       const asset = db.getAssetByQrCode(qrCode);
       if (!asset) return res.status(404).json({ error: 'Asset not found' });
-      // Check if the company requires a PIN (any user in the company has a PIN set)
-      const companyUsers = db.getUsers(asset.company_id);
-      const pinRequired = companyUsers.some(u => u.qr_pin);
-      if (!pinRequired) return res.json({ verified: true });
+      // If asset is marked public by admin, no PIN needed
+      if (asset.qr_public) return res.json({ verified: true });
       // Verify against any user's PIN in that company
+      const companyUsers = db.getUsers(asset.company_id);
       const valid = companyUsers.some(u => u.qr_pin === pin);
       if (!valid) return res.status(401).json({ error: 'Invalid PIN' });
       res.json({ verified: true });
@@ -879,9 +880,8 @@ module.exports = (db) => {
     try {
       const asset = db.getAssetByQrCode(req.params.qrCode);
       if (!asset) return res.status(404).json({ error: 'Asset not found' });
-      const companyUsers = db.getUsers(asset.company_id);
-      const pinRequired = companyUsers.some(u => u.qr_pin);
-      res.json({ pinRequired });
+      // PIN required unless admin has explicitly made this asset public
+      res.json({ pinRequired: !asset.qr_public });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
