@@ -705,7 +705,7 @@ const UserManagement = ({ currentUser, onClose }) => {
   };
 
   const handleUpdate = async () => {
-    try { await api('/users/' + editUser.id, { method: 'PUT', body: JSON.stringify({ displayName: editUser.display_name, email: editUser.email, role: editUser.role, isActive: editUser.is_active }) }); setEditUser(null); loadUsers(); } catch(e) { alert(e.message); }
+    try { await api('/users/' + editUser.id, { method: 'PUT', body: JSON.stringify({ displayName: editUser.display_name, email: editUser.email, role: editUser.role, isActive: editUser.is_active, qrPin: editUser.qr_pin || null }) }); setEditUser(null); loadUsers(); } catch(e) { alert(e.message); }
   };
 
   const handleResetPw = async (id) => {
@@ -773,6 +773,11 @@ const UserManagement = ({ currentUser, onClose }) => {
                 {availableRoles.map(r => <option key={r} value={r}>{roleLabels[r]}</option>)}
                 {!availableRoles.includes(editUser.role) && <option value={editUser.role}>{roleLabels[editUser.role]}</option>}
               </select>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontSize: 12, color: '#94a3b8' }}>🔐 QR Scan PIN (4 digits)</label>
+                <input className="input-field" type="tel" placeholder="No PIN set" maxLength={4} pattern="[0-9]*" inputMode="numeric" value={editUser.qr_pin||''} onChange={e => { const v = e.target.value.replace(/\D/g,'').slice(0,4); setEditUser({...editUser, qr_pin: v}); }} style={{ letterSpacing: 8, fontSize: 18, fontFamily: 'monospace', textAlign: 'center' }} />
+                <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Required to view assets via QR code scan. Leave empty to disable.</p>
+              </div>
               {editUser.id !== currentUser.id && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, cursor: 'pointer' }}>
                   <input type="checkbox" checked={editUser.is_active} onChange={e => setEditUser({...editUser, is_active: e.target.checked?1:0})} /> Active

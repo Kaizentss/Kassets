@@ -328,12 +328,18 @@ module.exports = (db) => {
         }
       }
 
-      db.updateUser(parseInt(req.params.id), {
+      const { qrPin } = req.body;
+      const updateData = {
         display_name: displayName,
         email,
         role: role || targetUser.role,
         is_active: isActive !== undefined ? (isActive ? 1 : 0) : targetUser.is_active
-      });
+      };
+      if (qrPin !== undefined) {
+        if (qrPin && !/^\d{4}$/.test(qrPin)) return res.status(400).json({ error: 'QR PIN must be exactly 4 digits' });
+        updateData.qr_pin = qrPin || null;
+      }
+      db.updateUser(parseInt(req.params.id), updateData);
       res.json({ message: 'Updated' });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -843,6 +849,39 @@ module.exports = (db) => {
       const companyId = getCompanyId(req);
       if (!companyId) return res.json([]);
       res.json(db.getQrCodes(companyId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Verify QR PIN
+  router.post('/public/verify-pin', (req, res) => {
+    try {
+      const { qrCode, pin } = req.body;
+      if (!qrCode || !pin) return res.status(400).json({ error: 'QR code and PIN required' });
+      const asset = db.getAssetByQrCode(qrCode);
+      if (!asset) return res.status(404).json({ error: 'Asset not found' });
+      // Check if the company requires a PIN (any user in the company has a PIN set)
+      const companyUsers = db.getUsers(asset.company_id);
+      const pinRequired = companyUsers.some(u => u.qr_pin);
+      if (!pinRequired) return res.json({ verified: true });
+      // Verify against any user's PIN in that company
+      const valid = companyUsers.some(u => u.qr_pin === pin);
+      if (!valid) return res.status(401).json({ error: 'Invalid PIN' });
+      res.json({ verified: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Check if a QR code requires PIN
+  router.get('/public/pin-required/:qrCode', (req, res) => {
+    try {
+      const asset = db.getAssetByQrCode(req.params.qrCode);
+      if (!asset) return res.status(404).json({ error: 'Asset not found' });
+      const companyUsers = db.getUsers(asset.company_id);
+      const pinRequired = companyUsers.some(u => u.qr_pin);
+      res.json({ pinRequired });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

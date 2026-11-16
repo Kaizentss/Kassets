@@ -763,12 +763,12 @@ module.exports = {
   getAssetByQrCode: (qrCode) => {
     for (const company of platform.companies) {
       const cData = loadCompanyData(company.id);
-      // Find the asset with this qr_code
       const asset = cData.assets.find(a => a.qr_code === qrCode);
       if (asset) {
         const photoMetas = cData.photos.filter(p => p.asset_id === asset.id);
         return {
           ...asset,
+          company_id: company.id,
           location_name: cData.locations.find(l => l.id === asset.location_id)?.name || 'Unknown',
           photos: photoMetas.map(p => ({ id: p.id, asset_id: p.asset_id, name: p.name })),
           thumbnailPhotoId: photoMetas.length > 0 ? photoMetas[0].id : null

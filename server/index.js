@@ -33,16 +33,45 @@ app.get('/manifest.json', (req, res) => {
   });
 });
 
-// Public QR code asset page
+// Public QR code asset page (with optional PIN gate)
 app.get('/qr/:code', (req, res) => {
   const asset = db.getAssetByQrCode(req.params.code);
-  if (!asset) return res.status(404).send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asset Not Found</title><style>body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}div{text-align:center;padding:40px}h1{color:#ffd700;margin-bottom:16px}p{color:#94a3b8}</style></head><body><div><h1>🪙 Kassets</h1><p>This QR code is not assigned to any asset.</p><p style="margin-top:20px;font-size:13px">Code: ' + req.params.code + '</p></div></body></html>');
+  if (!asset) {
+    return res.status(404).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asset Not Found</title><style>body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}div{text-align:center;padding:40px}h1{color:#ffd700;margin-bottom:16px}p{color:#94a3b8}</style></head><body><div><h1>\u{1FA99} Kassets</h1><p>This QR code is not assigned to any asset.</p><p style="margin-top:20px;font-size:13px">Code: ${req.params.code}</p></div></body></html>`);
+  }
 
-  const photoUrl = asset.thumbnailPhotoId ? '/api/public/photo/' + asset.thumbnailPhotoId : '';
-  const photosHtml = (asset.photos || []).map(p => '<img src="/api/public/photo/' + p.id + '" style="width:100%;max-width:400px;border-radius:12px;margin-bottom:12px" />').join('');
+  const companyUsers = db.getUsers(asset.company_id);
+  const pinRequired = companyUsers.some(u => u.qr_pin);
+  const qrCode = req.params.code;
+  const photosHtml = (asset.photos || []).map(p => `<img src="/api/public/photo/${p.id}" style="width:100%;max-width:400px;border-radius:12px;margin-bottom:12px" />`).join('');
+  const esc = (s) => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const pinGateHtml = pinRequired ? `
+  <div class="pin-gate" id="pin-gate">
+    <p style="color:#94a3b8;margin-bottom:20px;font-size:15px">\u{1F510} Enter PIN to view asset</p>
+    <input type="tel" class="pin-input" id="pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" autofocus placeholder="····" />
+    <br><button class="pin-btn" onclick="verifyPin()">Unlock</button>
+    <p class="pin-error" id="pin-error" style="display:none"></p>
+  </div>` : '';
+
+  const pinScript = pinRequired ? `<script>
+var pinInput=document.getElementById('pin-input');
+pinInput.addEventListener('keyup',function(e){if(e.key==='Enter')verifyPin()});
+async function verifyPin(){
+  var pin=pinInput.value;
+  if(pin.length!==4){showError('Enter 4-digit PIN');return}
+  try{
+    var r=await fetch('/api/public/verify-pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qrCode:'${qrCode}',pin:pin})});
+    var d=await r.json();
+    if(r.ok&&d.verified){document.getElementById('pin-gate').style.display='none';document.getElementById('asset-content').style.display='block'}
+    else{showError(d.error||'Invalid PIN');pinInput.value='';pinInput.focus()}
+  }catch(e){showError('Connection error')}
+}
+function showError(m){var el=document.getElementById('pin-error');el.textContent=m;el.style.display='block';setTimeout(function(){el.style.display='none'},3000)}
+</script>` : '';
 
   res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${asset.name} — Kassets</title>
+<title>${esc(asset.name)} — Kassets</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23ffd700' stroke='%23d4a000' stroke-width='4'/%3E%3Ctext x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='%23a07800' font-family='sans-serif'%3EK%3C/text%3E%3C/svg%3E" />
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -61,23 +90,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .photos{padding:24px;text-align:center}
 .photos img{display:block;margin:0 auto 12px}
 .footer{padding:16px 24px;text-align:center;font-size:11px;color:#475569;border-top:1px solid rgba(148,163,184,0.08)}
+.pin-gate{padding:40px 24px;text-align:center}
+.pin-input{background:rgba(15,23,42,0.8);border:2px solid rgba(148,163,184,0.2);border-radius:12px;color:#e2e8f0;font-size:28px;text-align:center;letter-spacing:12px;width:160px;padding:12px;font-family:monospace;outline:none}
+.pin-input:focus{border-color:#ffd700}
+.pin-btn{background:linear-gradient(135deg,#ffd700,#d4a000);color:#0f172a;border:none;padding:12px 32px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;margin-top:16px}
+.pin-error{color:#f87171;font-size:13px;margin-top:12px}
 </style></head><body>
 <div class="card">
-  <div class="header"><h1>🪙 Kassets</h1><p style="font-size:11px;color:#64748b">Asset Management</p></div>
-  <div class="body">
-    <div class="name">${asset.name}</div>
-    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-      <span class="badge cat">${asset.category || 'Uncategorized'}</span>
-      <span class="badge loc">${asset.location_name || 'Unknown'}</span>
+  <div class="header"><h1>\u{1FA99} Kassets</h1><p style="font-size:11px;color:#64748b">Asset Management</p></div>
+  ${pinGateHtml}
+  <div id="asset-content" style="${pinRequired ? 'display:none' : ''}">
+    <div class="body">
+      <div class="name">${esc(asset.name)}</div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+        <span class="badge cat">${esc(asset.category) || 'Uncategorized'}</span>
+        <span class="badge loc">${esc(asset.location_name) || 'Unknown'}</span>
+      </div>
+      ${asset.serial_number ? `<div class="field"><span class="label">Serial Number</span><span class="value">${esc(asset.serial_number)}</span></div>` : ''}
+      ${asset.part_number ? `<div class="field"><span class="label">Part Number</span><span class="value">${esc(asset.part_number)}</span></div>` : ''}
+      <div class="field"><span class="label">Quantity</span><span class="value">${asset.quantity}</span></div>
+      ${asset.description ? `<div class="field" style="flex-direction:column;gap:8px"><span class="label">Description</span><span class="value" style="text-align:left;color:#94a3b8">${esc(asset.description)}</span></div>` : ''}
     </div>
-    ${asset.serial_number ? '<div class="field"><span class="label">Serial Number</span><span class="value">' + asset.serial_number + '</span></div>' : ''}
-    ${asset.part_number ? '<div class="field"><span class="label">Part Number</span><span class="value">' + asset.part_number + '</span></div>' : ''}
-    <div class="field"><span class="label">Quantity</span><span class="value">${asset.quantity}</span></div>
-    ${asset.description ? '<div class="field" style="flex-direction:column;gap:8px"><span class="label">Description</span><span class="value" style="text-align:left;color:#94a3b8">' + asset.description + '</span></div>' : ''}
+    ${photosHtml ? `<div class="photos">${photosHtml}</div>` : ''}
   </div>
-  ${photosHtml ? '<div class="photos">' + photosHtml + '</div>' : ''}
   <div class="footer">Managed by Kassets — kassets.app</div>
 </div>
+${pinScript}
 </body></html>`);
 });
 
@@ -94,8 +132,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                                                            ║
-║   🪙  KASSETS — Multi-Company Asset Management             ║
-║   🌐  https://kassets.app                                  ║
+║   \u{1FA99}  KASSETS — Multi-Company Asset Management             ║
+║   \u{1F310}  https://kassets.app                                  ║
 ║                                                            ║
 ║   Local:   http://localhost:${PORT}                            ║
 ║                                                            ║
