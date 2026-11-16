@@ -16,6 +16,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -124,73 +125,63 @@ const roleColors = { super_admin: 'role-super', master_admin: 'role-master', adm
 const roleLabels = { super_admin: 'SUPER ADMIN', master_admin: 'MASTER ADMIN', admin: 'ADMIN', editor: 'EDITOR', viewer: 'VIEWER' };
 const formatCurrency = (amt) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amt || 0);
 
-// QR Scanner component — opens camera, scans in real-time, returns code
+// QR Scanner component — uses jsQR library (works on ALL browsers: Safari, Edge, Chrome, Firefox)
 const QrScanner = ({ onScan, onClose }) => {
   const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
   const streamRef = React.useRef(null);
   const [error, setError] = React.useState('');
-  const [scanning, setScanning] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
+    let animFrame = null;
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-        // Start scanning loop
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const hasBarcodeDetector = typeof BarcodeDetector !== 'undefined';
-        let detector = null;
-        if (hasBarcodeDetector) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch(e) {} }
-
-        const scan = async () => {
-          if (cancelled || !videoRef.current || videoRef.current.readyState < 2) { if (!cancelled) requestAnimationFrame(scan); return; }
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const scan = () => {
+          if (cancelled || !videoRef.current || videoRef.current.readyState < 2) { if (!cancelled) animFrame = requestAnimationFrame(scan); return; }
           canvas.width = videoRef.current.videoWidth;
           canvas.height = videoRef.current.videoHeight;
-          ctx.drawImage(videoRef.current, 0, 0);
-
-          if (detector) {
-            try {
-              const barcodes = await detector.detect(canvas);
-              if (barcodes.length > 0) {
-                let val = barcodes[0].rawValue;
-                // Extract code from URL if it's a kassets URL
-                const match = val.match(/\/qr\/([A-Z0-9]+)$/i);
-                if (match) val = match[1];
-                stream.getTracks().forEach(t => t.stop());
-                onScan(val);
-                return;
-              }
-            } catch(e) {}
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          if (typeof jsQR !== 'undefined') {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+            if (code && code.data) {
+              let val = code.data;
+              const match = val.match(/\/qr\/([A-Z0-9]+)$/i);
+              if (match) val = match[1];
+              stream.getTracks().forEach(t => t.stop());
+              onScan(val);
+              return;
+            }
           }
-          if (!cancelled) requestAnimationFrame(scan);
+          if (!cancelled) animFrame = requestAnimationFrame(scan);
         };
-
-        if (detector) {
-          requestAnimationFrame(scan);
-        } else {
-          setError('QR scanning not supported on this browser. Type the code manually.');
-        }
+        animFrame = requestAnimationFrame(scan);
       } catch(e) {
-        setError('Camera access denied. Please allow camera permissions.');
+        setError('Camera access denied. Allow camera permissions and try again.');
       }
     };
     startCamera();
-    return () => { cancelled = true; if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); };
+    return () => { cancelled = true; if (animFrame) cancelAnimationFrame(animFrame); if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); };
   }, []);
 
   return React.createElement('div', { style: { position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:2000, background:'#000', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' } },
+    React.createElement('canvas', { ref: canvasRef, style: { display:'none' } }),
     React.createElement('div', { style: { position:'absolute', top:16, right:16, zIndex:2001 } },
-      React.createElement('button', { onClick: () => { if(streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); onClose(); }, style: { background:'rgba(255,255,255,0.2)', border:'none', color:'white', fontSize:24, width:44, height:44, borderRadius:22, cursor:'pointer' } }, '✕')
+      React.createElement('button', { onClick: () => { if(streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); onClose(); }, style: { background:'rgba(255,255,255,0.2)', border:'none', color:'white', fontSize:24, width:48, height:48, borderRadius:24, cursor:'pointer' } }, '✕')
     ),
-    React.createElement('div', { style: { position:'absolute', top:16, left:16, zIndex:2001, color:'white', fontSize:14, fontWeight:600 } }, '📷 Scan QR Code'),
-    error ? React.createElement('p', { style: { color:'#f87171', padding:20, textAlign:'center' } }, error)
+    React.createElement('div', { style: { position:'absolute', top:20, left:16, zIndex:2001, color:'white', fontSize:15, fontWeight:600 } }, '📷 Scan QR Code'),
+    error ? React.createElement('p', { style: { color:'#f87171', padding:20, textAlign:'center', fontSize:15 } }, error)
     : React.createElement('div', { style: { position:'relative', width:'100%', maxWidth:500 } },
-        React.createElement('video', { ref: videoRef, style: { width:'100%', borderRadius:12 }, playsInline: true, muted: true }),
-        React.createElement('div', { style: { position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:200, height:200, border:'3px solid #ffd700', borderRadius:16, boxShadow:'0 0 0 9999px rgba(0,0,0,0.5)' } })
+        React.createElement('video', { ref: videoRef, style: { width:'100%' }, playsInline: true, muted: true, autoPlay: true }),
+        React.createElement('div', { style: { position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:220, height:220, border:'3px solid #ffd700', borderRadius:16, boxShadow:'0 0 0 9999px rgba(0,0,0,0.5)' } }),
+        React.createElement('p', { style: { position:'absolute', bottom:20, left:0, right:0, textAlign:'center', color:'rgba(255,255,255,0.7)', fontSize:13 } }, 'Point camera at QR code')
       )
   );
 };
