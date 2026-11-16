@@ -63,7 +63,7 @@ module.exports = (db) => {
       }
       const { username, password } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-      const user = db.getUser(sanitizeStr(username, 100));
+      const user = db.getUser(sanitizeStr(username, 100).toLowerCase().trim());
       if (!user || !bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
