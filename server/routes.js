@@ -57,7 +57,7 @@ module.exports = (db) => {
   // ========== AUTH ==========
   router.post('/auth/login', (req, res) => {
     try {
-      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
       if (!checkRateLimit(ip)) {
         return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
       }

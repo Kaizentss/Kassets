@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3001;
 // Database
 const db = require('./database');
 
+// Trust proxy (Cloudflare/Render) so req.ip shows real client IP
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
