@@ -12,14 +12,8 @@ const loginAttempts = {};
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
 
-function checkRateLimit(ip) {
-  const now = Date.now();
-  if (!loginAttempts[ip]) loginAttempts[ip] = [];
-  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
-  if (loginAttempts[ip].length >= MAX_ATTEMPTS) return false;
-  loginAttempts[ip].push(now);
-  return true;
-}
+// Rate limit check is done inline in the login route
+// Only FAILED attempts are counted; successful login clears the counter
 
 setInterval(() => {
   const now = Date.now();
@@ -58,15 +52,23 @@ module.exports = (db) => {
   router.post('/auth/login', (req, res) => {
     try {
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
-      if (!checkRateLimit(ip)) {
-        return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
+      // Check rate limit BEFORE attempting login
+      const now = Date.now();
+      if (!loginAttempts[ip]) loginAttempts[ip] = [];
+      loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
+      if (loginAttempts[ip].length >= MAX_ATTEMPTS) {
+        return res.status(429).json({ error: 'Too many failed login attempts. Try again in 15 minutes.' });
       }
       const { username, password } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
       const user = db.getUser(sanitizeStr(username, 100).toLowerCase().trim());
       if (!user || !bcrypt.compareSync(password, user.password)) {
+        // Only count FAILED attempts
+        loginAttempts[ip].push(now);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+      // Success — clear failed attempts for this IP
+      delete loginAttempts[ip];
       
       // Check if company is active (for non-super admins)
       if (user.company_id) {
