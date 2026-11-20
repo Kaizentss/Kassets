@@ -405,7 +405,7 @@ module.exports = {
   },
 
   // ========== USERS (still platform-level) ==========
-  getUser: (username) => platform.users.find(u => u.username === username && u.is_active),
+  getUser: (username) => platform.users.find(u => u.username === username && u.is_active !== 0 && u.is_active !== false),
   getUserById: (id) => platform.users.find(u => u.id === id),
   getUsers: (companyId) => {
     const filter = companyId ? platform.users.filter(u => u.company_id === companyId) : platform.users;

@@ -61,9 +61,15 @@ module.exports = (db) => {
       }
       const { username, password } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-      const user = db.getUser(sanitizeStr(username, 100).toLowerCase().trim());
-      if (!user || !bcrypt.compareSync(password, user.password)) {
-        // Only count FAILED attempts
+      const cleanUsername = sanitizeStr(username, 100).toLowerCase().trim();
+      const user = db.getUser(cleanUsername);
+      if (!user) {
+        console.log('[LOGIN DEBUG] User not found:', cleanUsername);
+        loginAttempts[ip].push(now);
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      if (!bcrypt.compareSync(password, user.password)) {
+        console.log('[LOGIN DEBUG] Password mismatch for:', cleanUsername, 'hash starts:', user.password?.substring(0, 10));
         loginAttempts[ip].push(now);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
