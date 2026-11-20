@@ -457,6 +457,7 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
                     <span className={`category-badge ${roleColors[u.role]}`}>{roleLabels[u.role]}</span>
                     <span className="location-badge">{u.company_name || 'Platform'}</span>
                     {!u.is_active && <span style={{ color: '#f87171', fontSize: 12 }}>INACTIVE</span>}
+                    {u.role !== 'super_admin' && <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => { const pw = prompt('New password for ' + u.username + ' (min 6 chars):'); if(pw && pw.length >= 6) { api('/users/' + u.id + '/reset-password', { method:'POST', body:JSON.stringify({ newPassword: pw }) }).then(() => alert('Password reset!')).catch(e => alert(e.message)); } else if(pw) { alert('Password must be at least 6 characters'); } }}>🔑 Reset PW</button>}
                     {u.role !== 'super_admin' && u.company_id && <button className="btn-danger" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => handleDeleteUser(u.id, u.company_id)}>🗑</button>}
                   </div>
                 </div>
@@ -556,6 +557,7 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
                   <span>{u.display_name || u.username} <span style={{ color: '#64748b', fontSize: 12 }}>@{u.username}</span></span>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span className={`category-badge ${roleColors[u.role]}`} style={{ fontSize: 11 }}>{roleLabels[u.role]}</span>
+                    <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => { const pw = prompt('New password for ' + u.username + ' (min 6 chars):'); if(pw && pw.length >= 6) { api('/users/' + u.id + '/reset-password', { method:'POST', body:JSON.stringify({ newPassword: pw }) }).then(() => alert('Password reset!')).catch(e => alert(e.message)); } else if(pw) { alert('Password must be at least 6 characters'); } }}>🔑</button>
                     <button className="btn-danger" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => handleDeleteUser(u.id, showViewCompany.id)}>🗑</button>
                   </div>
                 </div>
