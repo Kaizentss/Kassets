@@ -1837,7 +1837,7 @@ const AssetManager = ({ user, onLogout }) => {
                   const qrUrl = window.location.origin + '/qr/' + code;
                   const qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qrUrl);
                   const pw = window.open('', '_blank');
-                  pw.document.write('<!DOCTYPE html><html><head><title>QR Label — ' + code + '</title><style>@page{size:2in 1in;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif}.label{width:2in;height:1in;display:flex;align-items:center;padding:0.05in 0.1in;gap:0.08in}.label img{width:0.85in;height:0.85in}.info{display:flex;flex-direction:column;justify-content:center;flex:1}.code{font-size:9pt;font-weight:700;letter-spacing:0.5px}.name{font-size:7pt;color:#333;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0.9in}.url{font-size:5.5pt;color:#666;margin-top:1px}</style></head><body><div class="label"><img src="' + qrImgUrl + '" /><div class="info"><div class="code">' + code + '</div><div class="name">' + (editingAsset.name||'').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '</div><div class="url">kassets.app</div></div></div></body></html>');
+                  pw.document.write('<!DOCTYPE html><html><head><title>QR Label</title><style>@page{size:2in 1in;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif}.label{width:2in;height:1in;display:flex;align-items:center;justify-content:center;padding:0.05in}.label img{width:0.9in;height:0.9in}</style></head><body><div class="label"><img src="' + qrImgUrl + '" /></div></body></html>');
                   pw.document.close();
                 }}>🖨️ Print</button>}
                 {editingAsset.qrCode && <a href={'/qr/'+editingAsset.qrCode} target="_blank" className="btn-secondary" style={{ padding:'8px 12px', fontSize:12, display:'flex', alignItems:'center' }}>🔗</a>}
@@ -2024,17 +2024,14 @@ const AssetManager = ({ user, onLogout }) => {
                     for (const code of r.codes) {
                       const qrUrl = baseUrl + code;
                       const qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qrUrl);
-                      labelsHtml += '<div class="label"><img src="' + qrImgUrl + '" /><div class="info"><div class="code">' + code + '</div><div class="url">kassets.app/qr/' + code + '</div></div></div>';
+                      labelsHtml += '<div class="label"><img src="' + qrImgUrl + '" /></div>';
                     }
                     printWin.document.write('<!DOCTYPE html><html><head><title>Kassets QR Labels</title><style>' +
                       '@page{size:2in 1in;margin:0}' +
                       '*{box-sizing:border-box;margin:0;padding:0}' +
                       'body{font-family:-apple-system,sans-serif}' +
-                      '.label{width:2in;height:1in;display:flex;align-items:center;padding:0.05in 0.1in;page-break-after:always;gap:0.08in}' +
-                      '.label img{width:0.85in;height:0.85in}' +
-                      '.info{display:flex;flex-direction:column;justify-content:center;flex:1}' +
-                      '.code{font-size:9pt;font-weight:700;letter-spacing:0.5px}' +
-                      '.url{font-size:6pt;color:#666;margin-top:2px}' +
+                      '.label{width:2in;height:1in;display:flex;align-items:center;justify-content:center;padding:0.05in;page-break-after:always}' +
+                      '.label img{width:0.9in;height:0.9in}' +
                       '</style></head><body>' + labelsHtml + '</body></html>');
                     printWin.document.close();
                     alert(n + ' QR code(s) generated! Print window opened.');
